@@ -308,6 +308,50 @@ async def player_skip(db: AsyncSession, jukebox_id: int) -> None:
     await notify_jukebox(jukebox_id, "player.updated")
 
 
+async def player_previous(db: AsyncSession, jukebox_id: int) -> None:
+    """Vuelve a poner en PLAYING la última canción reproducida antes de la
+    actual. La que estaba sonando regresa al frente de la cola (QUEUED),
+    no se pierde. No vuelve a otorgar XP/créditos: eso ya pasó la primera
+    vez que sonó."""
+    player = await _get_player(db, jukebox_id, create=True)
+    current = await _current_item(db, player)
+
+    previous = (
+        await db.execute(
+            select(QueueItem)
+            .where(
+                QueueItem.jukebox_id == jukebox_id,
+                QueueItem.status == QueueStatus.PLAYED.value,
+            )
+            .order_by(QueueItem.played_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if previous is None:
+        raise AppError(
+            "no hay una canción anterior en el historial",
+            code="no_previous_track",
+            status_code=409,
+        )
+
+    if current is not None and current.status == QueueStatus.PLAYING.value:
+        for queued in await _queued(db, jukebox_id):
+            if queued.position is not None:
+                queued.position += 1
+        current.status = QueueStatus.QUEUED.value
+        current.played_at = None
+        current.position = 0
+
+    previous.status = QueueStatus.PLAYING.value
+    previous.played_at = datetime.now(UTC)
+    previous.position = None
+    player.current_item_id = previous.id
+    player.is_playing = True
+    player.position_ms = 0
+    await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")
+
+
 async def player_seek(db: AsyncSession, jukebox_id: int, position_ms: int) -> None:
     player = await _get_player(db, jukebox_id, create=True)
     current = await _current_item(db, player)

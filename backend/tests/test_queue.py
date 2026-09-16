@@ -181,6 +181,44 @@ async def test_history_after_skip():
     assert body[0]["status"] == "PLAYED"
 
 
+async def test_player_previous_replays_last_track():
+    owner_token, _member, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        first = (await _add(c, owner_token, jukebox_id, "aaa")).json()
+        second = (await _add(c, owner_token, jukebox_id, "bbb")).json()
+        await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/play", headers=_auth(owner_token))
+        await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/next", headers=_auth(owner_token))
+        r = await c.post(
+            f"/api/v1/jukeboxes/{jukebox_id}/player/previous", headers=_auth(owner_token)
+        )
+        q = (
+            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/queue", headers=_auth(owner_token))
+        ).json()
+        history = (
+            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/history", headers=_auth(owner_token))
+        ).json()
+    assert r.status_code == 204
+    assert q["player"]["is_playing"] is True
+    assert q["player"]["current_item_id"] == first["id"]
+    # "second" (lo que sonaba) no se pierde: vuelve al frente de la cola.
+    ids_by_status = {i["id"]: i["status"] for i in q["items"]}
+    assert ids_by_status[first["id"]] == "PLAYING"
+    assert ids_by_status[second["id"]] == "QUEUED"
+    assert history == []
+
+
+async def test_player_previous_without_history_409():
+    owner_token, _member, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        await _add(c, owner_token, jukebox_id, "aaa")
+        await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/play", headers=_auth(owner_token))
+        r = await c.post(
+            f"/api/v1/jukeboxes/{jukebox_id}/player/previous", headers=_auth(owner_token)
+        )
+    assert r.status_code == 409
+    assert r.json()["code"] == "no_previous_track"
+
+
 async def test_seek_clamps_to_duration():
     owner_token, _member, jukebox_id, _code = await _make_jukebox_x2()
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:

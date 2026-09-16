@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { music, queue } from "../../lib/endpoints";
+import { useCallback, useEffect, useState } from "react";
+import { queue } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
 import { ApiError } from "../../lib/api";
-import type { QueueOut, TrackInfo } from "../../lib/types";
-import { Button, Empty, Input, Panel } from "../../components/ui";
+import type { QueueOut } from "../../lib/types";
+import { Empty, Panel } from "../../components/ui";
 import { PlayerReadout } from "./PlayerReadout";
+import { AddTrackPanel } from "./AddTrackPanel";
 
 const BOOST_COST = 10;
 
 export function QueueTab() {
   const { jukebox, lastEvent } = useJukebox();
   const [data, setData] = useState<QueueOut | null>(null);
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<TrackInfo[]>([]);
-  const [searching, setSearching] = useState(false);
   const [boostError, setBoostError] = useState<{ itemId: number; message: string } | null>(null);
 
   const reload = useCallback(async () => {
@@ -27,24 +25,6 @@ export function QueueTab() {
   useEffect(() => {
     if (lastEvent?.event === "queue.updated" || lastEvent?.event === "player.updated") reload();
   }, [lastEvent, reload]);
-
-  async function onSearch(e: FormEvent) {
-    e.preventDefault();
-    if (!q.trim()) return;
-    setSearching(true);
-    try {
-      setResults(await music.search(q.trim()));
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  async function addTrack(trackId: string) {
-    await queue.add(jukebox.id, trackId);
-    setResults([]);
-    setQ("");
-    reload();
-  }
 
   async function toggleVote(itemId: number, voted: boolean) {
     if (voted) await queue.unvote(jukebox.id, itemId);
@@ -79,34 +59,7 @@ export function QueueTab() {
         <PlayerReadout item={playing} player={data.player} />
       </Panel>
 
-      <Panel accent style={{ marginBottom: "24px" }}>
-        <h3>añadir a la transmisión</h3>
-        <form onSubmit={onSearch} style={{ display: "flex", gap: 8 }}>
-          <Input
-            placeholder="buscar canción o artista…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <Button type="submit" size="sm" disabled={searching}>
-            buscar
-          </Button>
-        </form>
-        {results.length > 0 && (
-          <div className="search-results">
-            {results.map((t) => (
-              <button key={t.track_id} className="search-result" onClick={() => addTrack(t.track_id)}>
-                {t.thumbnail_url && <img src={t.thumbnail_url} alt="" />}
-                <span className="search-result__title">
-                  {t.title} {t.artist && `— ${t.artist}`}
-                </span>
-                {t.duration_seconds && (
-                  <span className="search-result__dur">{formatDuration(t.duration_seconds)}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </Panel>
+      <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} />
 
       <Panel style={{ padding: 0 }}>
         {pending.length === 0 && <Empty>la cola está vacía · agrega la primera canción</Empty>}

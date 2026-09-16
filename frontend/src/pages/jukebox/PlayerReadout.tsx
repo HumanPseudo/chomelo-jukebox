@@ -1,24 +1,24 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { PlayerStateOut, QueueItemOut } from "../../lib/types";
-import { Button, SignalDot, Tag } from "../../components/ui";
+import { SignalDot, Tag } from "../../components/ui";
 import { formatDuration } from "./QueueTab";
-import { useAudioSync } from "./useAudioSync";
 
+/**
+ * Puramente visual (progreso, título, tag en vivo/pausa). El <audio> real
+ * vive aparte, en AdminJukeboxLayout — que sigue montado sin importar en
+ * qué pestaña estés — para que no se corte la música al navegar entre
+ * Consola/Encuestas/Miembros. Ver useAudioSync.
+ */
 export function PlayerReadout({
   item,
   player,
   controls,
-  withAudio = false,
 }: {
   item: QueueItemOut | undefined;
   player: PlayerStateOut;
   controls?: ReactNode;
-  /** Solo el dispositivo conectado a las bocinas (el admin) reproduce
-   * audio de verdad; los oyentes solo ven el estado sincronizado. */
-  withAudio?: boolean;
 }) {
   const [positionMs, setPositionMs] = useState(player.position_ms);
-  const { audioRef, locked, unlock } = useAudioSync(item, player, withAudio);
 
   useEffect(() => {
     setPositionMs(player.position_ms);
@@ -29,12 +29,9 @@ export function PlayerReadout({
     return () => clearInterval(timer);
   }, [player.position_ms, player.is_playing]);
 
-  const audioTag = withAudio ? <audio ref={audioRef} preload="auto" /> : null;
-
   if (!item) {
     return (
       <div className="player">
-        {audioTag}
         <div className="player__art" />
         <div className="player__meta">
           <Tag>sin transmisión</Tag>
@@ -52,7 +49,6 @@ export function PlayerReadout({
 
   return (
     <div className="player">
-      {audioTag}
       {item.thumbnail_url ? (
         <img className="player__art" src={item.thumbnail_url} alt="" />
       ) : (
@@ -73,11 +69,6 @@ export function PlayerReadout({
           <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
         </div>
       </div>
-      {withAudio && player.is_playing && locked && (
-        <Button size="sm" onClick={unlock}>
-          🔇 activar sonido
-        </Button>
-      )}
       {controls}
       <SignalDot state={player.is_playing ? "rec" : "idle"} />
     </div>

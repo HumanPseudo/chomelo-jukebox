@@ -75,6 +75,7 @@ export const queue = {
     pause: (jukeboxId: number) => api.post(`/jukeboxes/${jukeboxId}/player/pause`),
     resume: (jukeboxId: number) => api.post(`/jukeboxes/${jukeboxId}/player/resume`),
     next: (jukeboxId: number) => api.post(`/jukeboxes/${jukeboxId}/player/next`),
+    previous: (jukeboxId: number) => api.post(`/jukeboxes/${jukeboxId}/player/previous`),
     seek: (jukeboxId: number, position_ms: number) =>
       api.post(`/jukeboxes/${jukeboxId}/player/seek`, { position_ms }),
   },

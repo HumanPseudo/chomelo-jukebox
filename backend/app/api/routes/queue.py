@@ -157,6 +157,15 @@ async def player_next(
     await queue_service.player_skip(db, member.jukebox_id)
 
 
+@router.post("/{jukebox_id}/player/previous", status_code=status.HTTP_204_NO_CONTENT)
+async def player_previous(
+    jukebox_id: int,
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await queue_service.player_previous(db, member.jukebox_id)
+
+
 @router.post("/{jukebox_id}/player/seek", status_code=status.HTTP_204_NO_CONTENT)
 async def player_seek(
     jukebox_id: int,

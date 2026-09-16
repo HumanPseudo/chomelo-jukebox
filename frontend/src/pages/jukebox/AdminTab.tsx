@@ -1,33 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { queue } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
-import type { QueueOut } from "../../lib/types";
+import { useAdminQueue } from "../../lib/adminQueueContext";
+import { ApiError } from "../../lib/api";
 import { Button, Empty, Panel } from "../../components/ui";
 import { PlayerReadout } from "./PlayerReadout";
+import { AddTrackPanel } from "./AddTrackPanel";
 import { formatDuration } from "./QueueTab";
 
 export function AdminTab() {
-  const { jukebox, lastEvent } = useJukebox();
-  const [data, setData] = useState<QueueOut | null>(null);
+  const { jukebox } = useJukebox();
+  const { data, reload } = useAdminQueue();
   const [busy, setBusy] = useState(false);
-
-  const reload = useCallback(async () => {
-    setData(await queue.get(jukebox.id));
-  }, [jukebox.id]);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  useEffect(() => {
-    if (lastEvent?.event === "queue.updated" || lastEvent?.event === "player.updated") reload();
-  }, [lastEvent, reload]);
+  const [error, setError] = useState("");
 
   async function act(fn: () => Promise<unknown>) {
     setBusy(true);
+    setError("");
     try {
       await fn();
       await reload();
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === "no_previous_track"
+          ? "no hay ninguna canción anterior en el historial"
+          : "no se pudo completar la acción",
+      );
     } finally {
       setBusy(false);
     }
@@ -44,9 +42,16 @@ export function AdminTab() {
         <PlayerReadout
           item={playing}
           player={data.player}
-          withAudio
           controls={
             <div className="player__controls">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => act(() => queue.player.previous(jukebox.id))}
+              >
+                anterior
+              </Button>
               {data.player.is_playing ? (
                 <Button size="sm" disabled={busy} onClick={() => act(() => queue.player.pause(jukebox.id))}>
                   pausar
@@ -75,7 +80,14 @@ export function AdminTab() {
             </div>
           }
         />
+        {error && (
+          <p className="error-text" style={{ marginTop: 8 }}>
+            {error}
+          </p>
+        )}
       </Panel>
+
+      <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} />
 
       <h3>moderar transmisión</h3>
       <Panel style={{ padding: 0 }}>
