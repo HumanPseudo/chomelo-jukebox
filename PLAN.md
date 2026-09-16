@@ -5,6 +5,18 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 14 — COMPLETADA ✅.** Tests de concurrencia contra Postgres real
+(Testcontainers) con `asyncio.gather` y sesiones/conexiones independientes
+simulando requests concurrentes: votos simultáneos, créditos/débitos de
+wallet simultáneos, webhook duplicado en paralelo, dos respuestas correctas
+a la vez en un minijuego. Los tests destaparon **tres carreras reales** que
+se corrigieron: creación de wallet sin `ON CONFLICT`, un evento de pago
+duplicado que podía reventar con `IntegrityError` sin manejar, dos
+jugadores ganando la misma ronda a la vez, y — la más sutil — un
+`SELECT ... FOR UPDATE` que bloqueaba correctamente en Postgres pero
+devolvía datos obsoletos por el identity map de SQLAlchemy (sin
+`populate_existing=True`). 152 tests verdes (147 + 5 de concurrencia).
+
 **FASE 13 — COMPLETADA ✅.** Seguridad avanzada: cabeceras de seguridad
 (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
 `Permissions-Policy`, `Cache-Control: no-store`, HSTS+CSP solo en
@@ -719,9 +731,90 @@ excepciones "catch-all" es la última red para no filtrar tracebacks,
 y `is_superuser` como bandera simple es suficiente antes de necesitar
 un sistema de roles global (YAGNI).
 
-## FASE 14 — Tests de concurrencia
+## FASE 14 — Tests de concurrencia ✅ (COMPLETADA)
+
 Votos simultáneos, transacciones de wallet simultáneas, webhooks duplicados,
 recompensas duplicadas. asyncio.gather + Testcontainers.
+
+**Entregables (todos completados):**
+- [x] `backend/tests/test_concurrency.py` — 5 tests contra Postgres real
+      (Testcontainers, no el SQLite en memoria del resto de la suite, porque
+      solo Postgres tiene semántica real de `FOR UPDATE` y de bloqueo en
+      `INSERT ... ON CONFLICT`); cada test lanza tareas `asyncio.gather` con
+      **sesiones/conexiones independientes** (como requests HTTP distintos)
+      y verifica el estado final en la base de datos, no el interleaving
+      exacto (para no ser un test frágil):
+      - voto simultáneo del mismo usuario a dos ítems: nunca terminan
+        sobreviviendo dos votos (UNIQUE(jukebox_id, user_id))
+      - 8 créditos concurrentes con la misma `idempotency_key`: se aplica
+        una sola vez
+      - 5 débitos concurrentes que exceden el saldo: nunca hay sobregiro,
+        el número de éxitos es determinista (`saldo // importe`)
+      - misma entrega de webhook duplicada dos veces en paralelo: nunca
+        avienta una excepción sin manejar y solo abona una vez
+      - dos jugadores acertando la misma ronda al mismo tiempo: "primer
+        acierto gana" se mantiene, solo un `GameAttempt.correct=True` y
+        una recompensa
+- [x] `backend/app/infra/db_utils.py` — `dialect_insert()` compartido
+      (Postgres/SQLite) para `INSERT ... ON CONFLICT DO NOTHING`, extraído
+      de `wallet_service` para reusarlo también en `payment_service`
+- [x] `backend/app/services/wallet_service.py` — **tres correcciones**
+      encontradas por los tests de concurrencia:
+      1. `get_wallet(..., create=True)` creaba la wallet con un `INSERT`
+         plano: dos requests concurrentes del mismo usuario por primera vez
+         violaban el UNIQUE(user_id). Ahora usa `ON CONFLICT DO NOTHING` +
+         re-select.
+      2. `_locked_wallet` hacía un `SELECT` sin lock (en `get_wallet`) y
+         luego un `SELECT ... FOR UPDATE` del mismo objeto en la misma
+         sesión: el lock de Postgres se adquiría correctamente, pero
+         SQLAlchemy no refrescaba los atributos del objeto ya presente en
+         el identity map, así que `wallet.credits` seguía con el valor
+         previo al bloqueo. Con saldo suficiente esto permitía sobregiro
+         bajo concurrencia real. Se corrigió añadiendo
+         `.execution_options(populate_existing=True)` al `SELECT FOR UPDATE`.
+      3. Refactor menor: `_insert()` (privado) pasó a ser
+         `dialect_insert()` en `app/infra/db_utils.py`.
+- [x] `backend/app/services/payment_service.py` — `consume_webhook` hacía
+      "check-then-insert" (`SELECT` de duplicado, luego `INSERT` del
+      evento): dos entregas concurrentes del mismo evento (reintento del
+      proveedor) podían hacer que la segunda reventara con
+      `IntegrityError` sin manejar en el UNIQUE de `provider_event_id`.
+      Ahora el `INSERT ... ON CONFLICT DO NOTHING` es la única fuente de
+      verdad atómica: si no insertó ninguna fila, es un duplicado seguro.
+- [x] `backend/app/services/game_service.py` — `guess()` leía la
+      `GameRound` sin lock antes de decidir si cerraba la ronda: dos
+      jugadores acertando "a la vez" podían cerrar la ronda y cobrar la
+      recompensa los dos. Nuevo helper `_get_round_locked()` con
+      `SELECT ... FOR UPDATE` (+ `populate_existing=True`) serializa las
+      respuestas por ronda.
+- [x] `backend/pyproject.toml` — `testcontainers[postgres]` como
+      dependencia de desarrollo (solo se usa en `test_concurrency.py`)
+
+**Verificación (ejecutada, Postgres real vía Testcontainers):**
+```bash
+cd backend && uv run pytest tests/test_concurrency.py -v   # ✓ 5 passed
+cd backend && uv run pytest -q                              # ✓ 152 passed (147 + 5 nuevos)
+cd backend && uv run ruff check . && ruff format --check .  # ✓ limpio
+```
+
+**Nota de diseño:** el hallazgo más importante fue el del punto 2 de
+wallet: `SELECT ... FOR UPDATE` bloquea correctamente en Postgres incluso
+si el objeto ya fue leído sin lock antes en la misma sesión — pero
+SQLAlchemy, por diseño, no sobreescribe los atributos de un objeto ya
+presente en el identity map salvo que se pida explícitamente con
+`populate_existing=True`. El resultado sin ese flag es un lock "real" a
+nivel de base de datos que protege el orden de escritura, pero con datos
+en memoria obsoletos en el momento de decidir — silencioso y sin ningún
+error, solo visible con concurrencia real (nunca con SQLite en memoria de
+un solo hilo). Se aplicó el mismo flag por consistencia a `game_service`
+aunque ahí no había una lectura previa que lo disparara.
+
+**Pendiente (diferido):** tests de concurrencia para `queue_service`
+(mover/reordenar ítems simultáneamente) y `poll_service` (cierre
+automático concurrente); los tests de esta fase corren contra un
+Postgres efímero de Testcontainers y no contra el Postgres de
+`docker-compose.yml`, así que no se ejecutan en el flujo normal de
+`pytest` sin Docker disponible.
 
 ## FASE 15 — Observabilidad
 Métricas Prometheus, dashboards Grafana, tracing (OpenTelemetry) si aporta.

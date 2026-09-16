@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.exceptions import AppError
 from app.domain.payment import Payment, PaymentEvent, PaymentStatus
 from app.domain.user import User
+from app.infra.db_utils import dialect_insert
 from app.providers.payments import PaymentProvider, PaymentProviderError
 from app.services import wallet_service
 
@@ -76,15 +77,6 @@ async def create_checkout(
     return CheckoutOut(payment=_to_out(payment), checkout_url=result.checkout_url)
 
 
-async def _event_already_processed(db: AsyncSession, provider_event_id: str) -> bool:
-    existing = (
-        await db.execute(
-            select(PaymentEvent.id).where(PaymentEvent.provider_event_id == provider_event_id)
-        )
-    ).scalar_one_or_none()
-    return existing is not None
-
-
 async def consume_webhook(
     db: AsyncSession, provider: PaymentProvider, payload: bytes, signature: str
 ) -> dict:
@@ -94,10 +86,6 @@ async def consume_webhook(
         raise AppError(
             "firma de webhook inválida", code="invalid_signature", status_code=400
         ) from None
-
-    if await _event_already_processed(db, event.event_id):
-        await db.commit()
-        return {"received": True, "duplicate": True}
 
     payment = (
         (
@@ -109,14 +97,21 @@ async def consume_webhook(
         else None
     )
 
-    db.add(
-        PaymentEvent(
+    # ON CONFLICT DO NOTHING: dos entregas concurrentes del mismo evento
+    # (reintento del proveedor) no deben procesarse dos veces (regla dura #3).
+    result = await db.execute(
+        dialect_insert(db, PaymentEvent)
+        .values(
             provider_event_id=event.event_id,
             payment_id=payment.id if payment else None,
             event_type=event.event_type,
             payload=event.raw,
         )
+        .on_conflict_do_nothing(index_elements=["provider_event_id"])
     )
+    if result.rowcount == 0:
+        await db.commit()
+        return {"received": True, "duplicate": True}
 
     if (
         event.is_completed_checkout

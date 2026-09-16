@@ -1,10 +1,9 @@
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
 from app.domain.wallet import Wallet, WalletTransaction
+from app.infra.db_utils import dialect_insert
 
 ADD_TRACK_CREDIT = 1
 TRACK_PLAYED_CREDIT = 1
@@ -13,21 +12,20 @@ CREATE_POLL_CREDIT = 2
 POLL_VOTE_CREDIT = 1
 
 
-def _insert(db: AsyncSession):
-    """Insert dialect-specific para usar ON CONFLICT DO NOTHING (SQLite y Postgres)."""
-    if db.get_bind().dialect.name == "postgresql":
-        return pg_insert(WalletTransaction)
-    return sqlite_insert(WalletTransaction)
-
-
 async def get_wallet(db: AsyncSession, user_id: int, *, create: bool = False) -> Wallet | None:
     wallet = (
         await db.execute(select(Wallet).where(Wallet.user_id == user_id))
     ).scalar_one_or_none()
     if wallet is None and create:
-        wallet = Wallet(user_id=user_id, credits=0)
-        db.add(wallet)
+        # ON CONFLICT DO NOTHING: dos requests concurrentes creando la wallet
+        # del mismo usuario por primera vez no deben violar el UNIQUE(user_id).
+        await db.execute(
+            dialect_insert(db, Wallet)
+            .values(user_id=user_id, credits=0)
+            .on_conflict_do_nothing(index_elements=["user_id"])
+        )
         await db.flush()
+        wallet = (await db.execute(select(Wallet).where(Wallet.user_id == user_id))).scalar_one()
     return wallet
 
 
@@ -35,8 +33,17 @@ async def _locked_wallet(db: AsyncSession, user_id: int) -> Wallet:
     wallet = await get_wallet(db, user_id, create=True)
     assert wallet is not None
     if wallet.id is not None:
+        # `wallet` ya puede estar cargado en el identity map de esta sesión
+        # (por el SELECT sin lock de `get_wallet`); sin `populate_existing`
+        # el FOR UPDATE bloquea correctamente en Postgres pero el objeto
+        # Python conserva el valor de `credits` previo al bloqueo.
         wallet = (
-            await db.execute(select(Wallet).where(Wallet.id == wallet.id).with_for_update())
+            await db.execute(
+                select(Wallet)
+                .where(Wallet.id == wallet.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
         ).scalar_one()
     return wallet
 
@@ -52,7 +59,7 @@ async def _ledger(
 ) -> int:
     """Inserta el movimiento en el ledger si no existe (idempotente) y actualiza el saldo."""
     result = await db.execute(
-        _insert(db)
+        dialect_insert(db, WalletTransaction)
         .values(
             wallet_id=wallet.id,
             idempotency_key=idempotency_key,

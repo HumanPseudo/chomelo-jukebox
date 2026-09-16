@@ -43,6 +43,23 @@ async def _get_round(db: AsyncSession, jukebox_id: int, round_id: int) -> GameRo
     return round_
 
 
+async def _get_round_locked(db: AsyncSession, jukebox_id: int, round_id: int) -> GameRound:
+    """Como `_get_round` pero con FOR UPDATE: dos jugadores respondiendo a la
+    vez no deben poder cerrar la ronda y cobrar la recompensa los dos
+    ("primer acierto gana", regla de Fase 9)."""
+    round_ = (
+        await db.execute(
+            select(GameRound)
+            .where(GameRound.id == round_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if round_ is None or round_.jukebox_id != jukebox_id:
+        raise AppError("ronda no encontrada", code="round_not_found", status_code=404)
+    return round_
+
+
 def _aware(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
@@ -197,7 +214,7 @@ async def guess(
     now: datetime,
 ) -> AttemptOut:
     game = _find_game(game_key)
-    round_ = await _get_round(db, member.jukebox_id, round_id)
+    round_ = await _get_round_locked(db, member.jukebox_id, round_id)
     if round_.game_key != game.key:
         raise AppError("ronda no encontrada", code="round_not_found", status_code=404)
 
