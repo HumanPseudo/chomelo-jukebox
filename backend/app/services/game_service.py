@@ -9,6 +9,7 @@ from app.domain.game import GameAttempt, GameRound, GameStatus
 from app.domain.jukebox import JukeboxMember
 from app.games import GAMES
 from app.infra import rate_limit
+from app.infra.events import notify_jukebox
 from app.services import wallet_service, xp_service
 
 DEFAULT_DURATION_SECONDS = 60
@@ -137,6 +138,7 @@ async def start_round(
     db.add(round_)
     await db.commit()
     await db.refresh(round_)
+    await notify_jukebox(member.jukebox_id, "game.updated", round_id=round_.id)
     return _to_out(round_)
 
 
@@ -160,12 +162,15 @@ async def list_rounds(
     rounds = (await db.execute(stmt)).scalars().all()
 
     result: list[RoundOut] = []
-    changed = False
+    changed_ids: list[int] = []
     for round_ in rounds:
-        changed = await _lazy_finish(db, round_, now) or changed
+        if await _lazy_finish(db, round_, now):
+            changed_ids.append(round_.id)
         result.append(_to_out(round_, await _my_attempt(db, round_.id, member.user_id)))
-    if changed:
+    if changed_ids:
         await db.commit()
+        for rid in changed_ids:
+            await notify_jukebox(member.jukebox_id, "game.updated", round_id=rid)
     return result
 
 
@@ -176,8 +181,10 @@ async def get_round(
     round_ = await _get_round(db, member.jukebox_id, round_id)
     if round_.game_key != game.key:
         raise AppError("ronda no encontrada", code="round_not_found", status_code=404)
-    await _lazy_finish(db, round_, now)
+    changed = await _lazy_finish(db, round_, now)
     await db.commit()
+    if changed:
+        await notify_jukebox(member.jukebox_id, "game.updated", round_id=round_.id)
     return _to_out(round_, await _my_attempt(db, round_.id, member.user_id))
 
 
@@ -194,9 +201,11 @@ async def guess(
     if round_.game_key != game.key:
         raise AppError("ronda no encontrada", code="round_not_found", status_code=404)
 
-    await _lazy_finish(db, round_, now)
+    changed = await _lazy_finish(db, round_, now)
     if round_.status != GameStatus.OPEN.value:
         await db.commit()
+        if changed:
+            await notify_jukebox(member.jukebox_id, "game.updated", round_id=round_.id)
         raise AppError("la ronda ya terminó", code="round_finished", status_code=409)
 
     existing = (
@@ -242,6 +251,7 @@ async def guess(
         )
 
     await db.commit()
+    await notify_jukebox(member.jukebox_id, "game.updated", round_id=round_.id)
 
     return AttemptOut(
         round_id=round_.id,

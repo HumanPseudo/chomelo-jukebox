@@ -4,6 +4,7 @@ import os
 
 os.environ.setdefault("CHOMELO_DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("CHOMELO_REDIS_URL", "redis://127.0.0.1:1/0")
+os.environ.setdefault("CHOMELO_WS_PUBSUB_ENABLED", "false")
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -12,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_clock, get_music_provider
 from app.db.base import Base
 from app.db.session import get_db
+from app.infra.ws_manager import ws_manager
 from app.main import app
 from app.providers.payments import get_payment_provider
 
@@ -36,6 +38,7 @@ async def _reset_db():
     app.dependency_overrides.pop(get_music_provider, None)
     app.dependency_overrides.pop(get_clock, None)
     app.dependency_overrides.pop(get_payment_provider, None)
+    ws_manager.reset()
     yield
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

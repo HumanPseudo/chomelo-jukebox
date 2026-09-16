@@ -31,6 +31,9 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # WebSockets: pub/sub Redis para escalar entre instancias (fail-open).
+    ws_pubsub_enabled: bool = True
+
 
 def get_settings() -> Settings:
     return Settings()

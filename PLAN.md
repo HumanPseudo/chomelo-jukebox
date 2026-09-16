@@ -5,6 +5,12 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 12 — COMPLETADA ✅.** WebSockets: canal por jukebox con auth por token
+(query JWT), `WSManager` con fan-out local + Redis Pub/Sub (`instance_id` para
+evitar duplicados), eventos `queue/ player/poll/game.updated` emitidos desde
+services tras commit, suscriptor en lifespan (fail-open). Verificado en Docker
+real con dos clientes. 136 tests verdes.
+
 **FASE 11 — COMPLETADA ✅.** Micropagos: `PaymentProvider` (ABC, Stripe +
 mock de desarrollo), checkout, webhook con verificación de firma e idempotencia
 (evento UNIQUE `provider_event_id`), flujo PENDING→PROCESSED→CREDITS_GRANTED y
@@ -581,9 +587,52 @@ payload crudo (nunca re-serializar antes de verificar), doble capa de idempotenc
 (evento UNIQUE + wallet idempotency key), los 200 idempotentes evitan reintentos
 sin fin del proveedor.
 
-## FASE 12 — WebSockets
+## FASE 12 — WebSockets ✅ (COMPLETADA)
 Canales por jukebox `/ws/jukebox/{id}`, broadcast de cola/player/votos/polls/juegos,
 Redis Pub/Sub para escalar. Reconexión y auth por token.
+
+**Entregables (todos completados):**
+- [x] `backend/app/infra/ws_manager.py` — `WSManager` con conexiones agrupadas por
+      jukebox, `broadcast_local` (envío directo) + publicación en Redis Pub/Sub
+      (channel `chomelo:ws`, mensaje con `instance_id` que el suscriptor ignora para
+      no duplicar) y suscriptor por instancia (fail-open: sin Redis sigue el
+      broadcast local)
+- [x] `backend/app/infra/events.py` — `notify_jukebox(jukebox_id, type, **data)`:
+      emisor único usado por los services
+- [x] `backend/app/api/routes/ws.py` — `WS /ws/jukebox/{id}` con auth por
+      `?token=` (JWT, solo tipo access), membresía obligatoria (no-GUEST) y
+      handshake: `connected` + bucle keepalive (`ping`→`pong`); cierra 4401
+      (auth) / 4403 (sin membresía)
+- [x] Integración en services (eventos tras commit): `queue.updated` (añadir/
+      quitar/mover/votar), `player.updated` (play/pause/resume/next/seek),
+      `poll.updated` (crear/votar/cerrar/borrar/auto-cierre), `game.updated`
+      (ronda iniciada / respondida / auto-fin)
+- [x] Lifespan en `main.py`: arranca/para el suscriptor; `settings.ws_pubsub_enabled`
+      (false en tests)
+- [x] `backend/tests/test_ws.py` — 6 tests (token inválido 4401, no miembro 4403,
+      hello, broadcast de cola/player/poll/game, aislamiento por jukebox)
+      verificado con `starlette.TestClient`
+
+**Verificación (ejecutada, Postgres real + Redis Docker):**
+```bash
+WS /ws/jukebox/4?token=…                       # ✓ {"event":"connected",...}
+POST /jukeboxes/4/queue                        # ✓ {"event":"queue.updated","data":{"item_id":14}}
+POST /jukeboxes/4/queue/14/vote                # ✓ {"event":"queue.updated",...}
+POST /jukeboxes/4/player/{pause,resume,next}   # ✓ {"event":"player.updated",...}
+cd backend && uv run pytest -q                 # ✓ 136 passed (6 nuevos)
+cd backend && uv run ruff check . && format    # ✓ limpio
+```
+
+**Pendiente (diferido):** reconexión con backoff en el cliente + "last known
+state" (el cliente re-sincroniza con REST al reconectar); suscripción a eventos
+de wallet/usuario (canales `/ws/me`); `subscribe` por suscripción selectiva.
+
+**Conceptos que se aprenden:** WebSocket como canal push (los datos viajan por
+REST, el WS avisa para refetch), auth por query con JWT (los navegadores no
+envían headers en WS), agrupación por sala (jukebox_id) con fan-out solo a la
+sala, Redis Pub/Sub como bus horizontal entre instancias detrás del balanceador,
+guarda `instance_id` para no duplicar el envío local, evento mínimo (aviso, no
+payload completo) = YAGNI.
 
 ## FASE 13 — Seguridad avanzada
 Hardening: headers, CORS estricto, rate limits globales, audit log de acciones

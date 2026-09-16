@@ -8,6 +8,7 @@ from app.core.exceptions import AppError
 from app.domain.jukebox import JukeboxMember
 from app.domain.poll import Poll, PollOption, PollStatus, PollVote
 from app.infra import rate_limit
+from app.infra.events import notify_jukebox
 from app.services import wallet_service, xp_service
 
 POLL_VOTE_RATE_LIMIT = 30
@@ -31,11 +32,13 @@ async def _get_poll(db: AsyncSession, jukebox_id: int, poll_id: int) -> Poll:
     return poll
 
 
-async def _auto_close(db: AsyncSession, poll: Poll) -> None:
+async def _auto_close(db: AsyncSession, poll: Poll) -> bool:
     if poll.status == PollStatus.OPEN.value and poll.closes_at is not None:
         if _is_past(poll.closes_at):
             poll.status = PollStatus.CLOSED.value
             await db.flush()
+            return True
+    return False
 
 
 async def _counts(db: AsyncSession, poll_id: int) -> dict[int, int]:
@@ -101,6 +104,7 @@ async def create_poll(db: AsyncSession, member: JukeboxMember, payload: PollCrea
     )
     await db.commit()
     await db.refresh(poll)
+    await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=poll.id)
     return _to_out(poll, {})
 
 
@@ -113,20 +117,26 @@ async def list_polls(
     polls = (await db.execute(stmt)).scalars().all()
 
     result: list[PollOut] = []
+    closed_ids: list[int] = []
     for poll in polls:
-        await _auto_close(db, poll)
+        if await _auto_close(db, poll):
+            closed_ids.append(poll.id)
         result.append(
             _to_out(poll, await _counts(db, poll.id), await _my_option(db, poll.id, member.user_id))
         )
-    if any(p.status == PollStatus.CLOSED.value for p in polls):
+    if closed_ids:
         await db.commit()
+        for pid in closed_ids:
+            await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=pid)
     return result
 
 
 async def get_poll(db: AsyncSession, member: JukeboxMember, poll_id: int) -> PollOut:
     poll = await _get_poll(db, member.jukebox_id, poll_id)
-    await _auto_close(db, poll)
+    changed = await _auto_close(db, poll)
     await db.commit()
+    if changed:
+        await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=poll.id)
     return _to_out(poll, await _counts(db, poll.id), await _my_option(db, poll.id, member.user_id))
 
 
@@ -135,6 +145,7 @@ async def close_poll(db: AsyncSession, member: JukeboxMember, poll_id: int) -> P
     poll.status = PollStatus.CLOSED.value
     await db.commit()
     await db.refresh(poll)
+    await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=poll.id)
     return _to_out(poll, await _counts(db, poll.id), await _my_option(db, poll.id, member.user_id))
 
 
@@ -142,6 +153,7 @@ async def delete_poll(db: AsyncSession, member: JukeboxMember, poll_id: int) -> 
     poll = await _get_poll(db, member.jukebox_id, poll_id)
     await db.delete(poll)
     await db.commit()
+    await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=poll_id)
 
 
 async def cast_vote(db: AsyncSession, member: JukeboxMember, poll_id: int, option_id: int) -> None:
@@ -184,3 +196,4 @@ async def cast_vote(db: AsyncSession, member: JukeboxMember, poll_id: int, optio
         description="Participaste en una encuesta",
     )
     await db.commit()
+    await notify_jukebox(member.jukebox_id, "poll.updated", poll_id=poll.id)

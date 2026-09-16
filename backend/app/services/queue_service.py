@@ -7,6 +7,7 @@ from app.core.exceptions import AppError
 from app.domain.jukebox import JukeboxMember, Role, role_rank
 from app.domain.queue import Player, QueueItem, QueueStatus
 from app.domain.vote import Vote
+from app.infra.events import notify_jukebox
 from app.providers.music import MusicProvider
 from app.services import music_service, wallet_service, xp_service
 
@@ -96,6 +97,7 @@ async def add_to_queue(
     )
     await db.commit()
     await db.refresh(item)
+    await notify_jukebox(member.jukebox_id, "queue.updated", item_id=item.id)
     return item
 
 
@@ -164,6 +166,7 @@ async def remove_item(db: AsyncSession, actor: JukeboxMember, item_id: int) -> N
         ):
             queued.position -= 1
     await db.commit()
+    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item_id)
 
 
 async def move_item(
@@ -185,6 +188,7 @@ async def move_item(
         queued.position = index
     await db.commit()
     await db.refresh(item)
+    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item.id)
     return item
 
 
@@ -194,6 +198,7 @@ async def player_play(db: AsyncSession, jukebox_id: int) -> None:
     if current is not None and current.status == QueueStatus.PLAYING.value:
         player.is_playing = True
         await db.commit()
+        await notify_jukebox(jukebox_id, "player.updated")
         return
     queued = await _queued(db, jukebox_id)
     if not queued:
@@ -214,6 +219,7 @@ async def player_play(db: AsyncSession, jukebox_id: int) -> None:
         description="Tu canción se reprodujo",
     )
     await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")
     return
 
 
@@ -224,6 +230,7 @@ async def player_pause(db: AsyncSession, jukebox_id: int) -> None:
         raise AppError("no hay nada reproduciéndose", code="nothing_playing", status_code=409)
     player.is_playing = False
     await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")
 
 
 async def player_resume(db: AsyncSession, jukebox_id: int) -> None:
@@ -233,6 +240,7 @@ async def player_resume(db: AsyncSession, jukebox_id: int) -> None:
         raise AppError("no hay nada reproduciéndose", code="nothing_playing", status_code=409)
     player.is_playing = True
     await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")
 
 
 async def player_skip(db: AsyncSession, jukebox_id: int) -> None:
@@ -265,6 +273,7 @@ async def player_skip(db: AsyncSession, jukebox_id: int) -> None:
         player.is_playing = False
         player.position_ms = 0
     await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")
 
 
 async def player_seek(db: AsyncSession, jukebox_id: int, position_ms: int) -> None:
@@ -277,3 +286,4 @@ async def player_seek(db: AsyncSession, jukebox_id: int, position_ms: int) -> No
         clamped = min(position_ms, current.duration_seconds * 1000)
     player.position_ms = clamped
     await db.commit()
+    await notify_jukebox(jukebox_id, "player.updated")

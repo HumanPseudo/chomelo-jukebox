@@ -12,6 +12,7 @@ from app.api.routes import (
     queue,
     users,
     wallet,
+    ws,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -26,3 +27,4 @@ api_router.include_router(polls.router)
 api_router.include_router(games.router)
 api_router.include_router(wallet.router)
 api_router.include_router(payments.router)
+api_router.include_router(ws.router)

@@ -6,6 +6,7 @@ from app.domain.jukebox import JukeboxMember
 from app.domain.queue import QueueItem, QueueStatus
 from app.domain.vote import Vote
 from app.infra import rate_limit
+from app.infra.events import notify_jukebox
 from app.services import queue_service, wallet_service, xp_service
 
 VOTE_RATE_LIMIT = 30
@@ -56,6 +57,7 @@ async def cast_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> Non
     )
     await db.commit()
     await queue_service.reorder_queue_by_score(db, actor.jukebox_id)
+    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item_id)
 
 
 async def remove_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> None:
@@ -65,3 +67,4 @@ async def remove_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> N
     await db.delete(vote)
     await db.commit()
     await queue_service.reorder_queue_by_score(db, actor.jukebox_id)
+    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item_id)
