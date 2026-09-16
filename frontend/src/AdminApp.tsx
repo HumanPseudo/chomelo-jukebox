@@ -1,40 +1,43 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
 import { RequireAuth } from "./components/RequireAuth";
-import { AppShell } from "./components/AppShell";
+import { AdminShell } from "./components/AdminShell";
 import { Login } from "./pages/Login";
-import { Register } from "./pages/Register";
-import { JukeboxesHome } from "./pages/JukeboxesHome";
-import { WalletView } from "./pages/WalletView";
-import { ProfileView } from "./pages/ProfileView";
-import { JukeboxLayout } from "./pages/jukebox/JukeboxLayout";
-import { QueueTab } from "./pages/jukebox/QueueTab";
+import { AdminJukeboxList } from "./pages/admin/AdminJukeboxList";
+import { AdminJukeboxLayout } from "./pages/admin/AdminJukeboxLayout";
+import { AdminTab } from "./pages/jukebox/AdminTab";
 import { PollsTab } from "./pages/jukebox/PollsTab";
 import { GamesTab } from "./pages/jukebox/GamesTab";
 import { MembersTab } from "./pages/jukebox/MembersTab";
 
-export function App() {
+export function AdminApp() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route
+            path="/login"
+            element={
+              <Login
+                homePath="/"
+                showRegister={false}
+                title="Consola de admin"
+                tagline="control de transmisión · solo para quien administra"
+              />
+            }
+          />
 
           <Route
             element={
               <RequireAuth>
-                <AppShell />
+                <AdminShell />
               </RequireAuth>
             }
           >
-            <Route path="/" element={<Navigate to="/jukeboxes" replace />} />
-            <Route path="/jukeboxes" element={<JukeboxesHome />} />
-            <Route path="/wallet" element={<WalletView />} />
-            <Route path="/profile" element={<ProfileView />} />
+            <Route path="/" element={<AdminJukeboxList />} />
 
-            <Route path="/jukeboxes/:id" element={<JukeboxLayout />}>
-              <Route index element={<QueueTab />} />
+            <Route path="/:id" element={<AdminJukeboxLayout />}>
+              <Route index element={<AdminTab />} />
               <Route path="polls" element={<PollsTab />} />
               <Route path="games" element={<GamesTab />} />
               <Route path="members" element={<MembersTab />} />

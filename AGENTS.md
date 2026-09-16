@@ -63,7 +63,8 @@ chomelo/
 docker compose up -d
 # API: http://localhost:8000  (docs: /docs)
 # Worker: http://localhost:9000/health
-# Frontend: http://localhost:5173
+# Frontend (oyentes): http://localhost:5173
+# Frontend (admin):   http://localhost:5174
 ```
 
 ## Frontend
@@ -74,11 +75,25 @@ en vivo, rojo = alarma), esquinas cortadas en diagonal (`clip-path`) en
 vez de `border-radius`. Tipografías autohospedadas (`@fontsource`):
 Chakra Petch (UI) + JetBrains Mono (datos/números). Ver
 `frontend/src/styles/tokens.css`.
+
+**Dos apps, un solo proyecto Vite (multi-página):** `index.html` (app de
+oyentes, `App.tsx`) y `admin.html` (consola de administración,
+`AdminApp.tsx`) comparten `src/lib/`, `src/components/` y las páginas de
+`src/pages/jukebox/`. Se sirven en **puertos distintos a propósito**
+(5173 / 5174 → orígenes distintos → `localStorage` separado), para que
+la sesión de un oyente y la de un admin en el mismo navegador nunca se
+pisen. El servicio `admin` de `docker-compose.yml` pasa
+`VITE_ENTRY=admin`, que un plugin en `vite.config.ts` usa para servir
+`admin.html` en la raíz `/` (así la URL de la consola es
+`http://localhost:5174/` sin sufijo).
 - El WebSocket solo avisa (`queue.updated`, `player.updated`, etc.); los
   datos siempre se re-sincronizan por REST — nunca confiar en el payload
   del evento.
-- Panel `/jukeboxes/:id/admin` (reproductor + moderación de cola) solo
-  visible para MODERATOR+; el resto de miembros ve la cola en solo lectura.
+- La consola de admin (`AdminApp` → pestaña "Consola" = `AdminTab.tsx`,
+  reproductor + moderación de cola) solo es alcanzable si el usuario
+  tiene rol MODERATOR+ en esa jukebox (si no, `AdminJukeboxLayout`
+  redirige a `/`); la app de oyentes (`App.tsx`) no tiene ninguna ruta
+  de administración.
 - Jukebox física real: solo el dispositivo del admin (conectado a las
   bocinas) reproduce audio de verdad (`useAudioSync`, `withAudio` en
   `PlayerReadout`); los oyentes normales solo ven el estado sincronizado,

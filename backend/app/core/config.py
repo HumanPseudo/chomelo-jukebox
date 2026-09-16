@@ -29,7 +29,13 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     cents_per_credit: int = 10
 
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # 5173: app de oyentes; 5174: consola de admin (orígenes separados a
+    # propósito para que cada una tenga su propio localStorage/sesión).
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
 
     # WebSockets: pub/sub Redis para escalar entre instancias (fail-open).
     ws_pubsub_enabled: bool = True

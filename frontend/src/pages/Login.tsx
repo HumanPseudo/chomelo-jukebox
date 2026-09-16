@@ -4,7 +4,17 @@ import { useAuth } from "../lib/auth";
 import { ApiError } from "../lib/api";
 import { Button, Field, Input, Panel } from "../components/ui";
 
-export function Login() {
+export function Login({
+  homePath = "/jukeboxes",
+  showRegister = true,
+  title = "Sintonizar señal",
+  tagline = "acceso a la red de jukebox clandestinas",
+}: {
+  homePath?: string;
+  showRegister?: boolean;
+  title?: string;
+  tagline?: string;
+}) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,7 +29,7 @@ export function Login() {
     setBusy(true);
     try {
       await login(email, password);
-      const from = (location.state as { from?: string })?.from ?? "/jukeboxes";
+      const from = (location.state as { from?: string })?.from ?? homePath;
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "no se pudo conectar con el servidor");
@@ -33,8 +43,8 @@ export function Login() {
       <div className="auth__panel">
         <div className="auth__brand">
           <span className="mark">⌁</span>
-          <h1>Sintonizar señal</h1>
-          <p className="auth__tagline">acceso a la red de jukebox clandestinas</p>
+          <h1>{title}</h1>
+          <p className="auth__tagline">{tagline}</p>
         </div>
         <Panel accent>
           <form onSubmit={onSubmit}>
@@ -60,9 +70,11 @@ export function Login() {
             </Button>
           </form>
         </Panel>
-        <p className="auth__switch">
-          ¿primera transmisión? <Link to="/register">crear identidad</Link>
-        </p>
+        {showRegister && (
+          <p className="auth__switch">
+            ¿primera transmisión? <Link to="/register">crear identidad</Link>
+          </p>
+        )}
       </div>
     </div>
   );

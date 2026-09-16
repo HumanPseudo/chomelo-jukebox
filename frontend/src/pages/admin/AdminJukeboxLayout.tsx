@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet, useParams } from "react-router-dom";
 import { jukeboxes } from "../../lib/endpoints";
 import { JukeboxProvider } from "../../lib/jukeboxContext";
 import { useJukeboxSocket } from "../../lib/useJukeboxSocket";
-import type { JukeboxOut, WsEvent } from "../../lib/types";
+import { roleAtLeast, type JukeboxOut, type WsEvent } from "../../lib/types";
 import { Empty, SignalDot } from "../../components/ui";
 
 function tabClass({ isActive }: { isActive: boolean }) {
   return `jb-tab ${isActive ? "is-active" : ""}`;
 }
 
-export function JukeboxLayout() {
+export function AdminJukeboxLayout() {
   const { id } = useParams();
   const jukeboxId = Number(id);
   const [jukebox, setJukebox] = useState<JukeboxOut | null>(null);
@@ -29,11 +29,18 @@ export function JukeboxLayout() {
 
   if (!jukebox) return <Empty>sintonizando…</Empty>;
 
+  if (!roleAtLeast(jukebox.role, "MODERATOR")) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <JukeboxProvider value={{ jukebox, wsStatus, lastEvent, reloadJukebox }}>
       <div className="jb-header">
         <div>
-          <h1 style={{ marginBottom: 4 }}>{jukebox.name}</h1>
+          <Link to="/" className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>
+            ← consolas
+          </Link>
+          <h1 style={{ margin: "4px 0" }}>{jukebox.name}</h1>
           <span className="mono" style={{ fontSize: 12, color: "var(--dim)" }}>
             código {jukebox.invite_code} · {jukebox.member_count} en la señal
           </span>
@@ -46,7 +53,7 @@ export function JukeboxLayout() {
 
       <nav className="jb-tabs">
         <NavLink to="" end className={tabClass}>
-          Cola
+          Consola
         </NavLink>
         <NavLink to="polls" className={tabClass}>
           Encuestas
