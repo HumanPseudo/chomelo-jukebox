@@ -16,7 +16,7 @@ router = APIRouter(prefix="/jukeboxes", tags=["jukebox", "poll"])
 async def create_poll(
     jukebox_id: int,
     payload: PollCreate,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
     db: AsyncSession = Depends(get_db),
 ) -> PollOut:
     return await poll_service.create_poll(db, member, payload)

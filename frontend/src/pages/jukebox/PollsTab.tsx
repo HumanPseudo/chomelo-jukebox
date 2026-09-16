@@ -47,34 +47,41 @@ export function PollsTab() {
 
   return (
     <div>
-      <Panel accent style={{ marginBottom: 24 }}>
-        <h3>lanzar encuesta</h3>
-        <form onSubmit={onCreate}>
-          <Field label="pregunta">
-            <Input value={question} onChange={(e) => setQuestion(e.target.value)} />
-          </Field>
-          {options.map((opt, i) => (
-            <Field key={i} label={`opción ${i + 1}`}>
-              <Input
-                value={opt}
-                onChange={(e) => {
-                  const next = [...options];
-                  next[i] = e.target.value;
-                  setOptions(next);
-                }}
-              />
+      {canModerate && (
+        <Panel accent style={{ marginBottom: 24 }}>
+          <h3>lanzar encuesta</h3>
+          <form onSubmit={onCreate}>
+            <Field label="pregunta">
+              <Input value={question} onChange={(e) => setQuestion(e.target.value)} />
             </Field>
-          ))}
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setOptions([...options, ""])}>
-              + opción
-            </Button>
-            <Button type="submit" size="sm">
-              publicar
-            </Button>
-          </div>
-        </form>
-      </Panel>
+            {options.map((opt, i) => (
+              <Field key={i} label={`opción ${i + 1}`}>
+                <Input
+                  value={opt}
+                  onChange={(e) => {
+                    const next = [...options];
+                    next[i] = e.target.value;
+                    setOptions(next);
+                  }}
+                />
+              </Field>
+            ))}
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setOptions([...options, ""])}
+              >
+                + opción
+              </Button>
+              <Button type="submit" size="sm">
+                publicar
+              </Button>
+            </div>
+          </form>
+        </Panel>
+      )}
 
       {list.length === 0 && <Empty>no hay encuestas todavía</Empty>}
       {list.map((poll) => {

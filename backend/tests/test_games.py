@@ -85,6 +85,31 @@ async def test_start_round_and_duplicate_409():
     assert dup.json()["code"] == "round_in_progress"
 
 
+async def test_plain_member_cannot_start_round():
+    """Solo MODERATOR+ lanza rondas; un MEMBER normal solo participa."""
+    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        await _play_songs(c, owner_token, jukebox_id, 4)
+        r = await c.post(f"{_game_path(jukebox_id)}/rounds", headers=auth(member_token), json={})
+    assert r.status_code == 403
+    assert r.json()["code"] == "insufficient_role"
+
+
+async def test_plain_member_can_answer_round_started_by_admin():
+    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        await _play_songs(c, owner_token, jukebox_id, 4)
+        round_ = await _start_round(c, owner_token, jukebox_id)
+        answer_title = f"Titulo {round_['track_id']}"
+        r = await c.post(
+            f"{_game_path(jukebox_id)}/rounds/{round_['id']}/answer",
+            headers=auth(member_token),
+            json={"title": answer_title},
+        )
+    assert r.status_code == 200
+    assert r.json()["correct"] is True
+
+
 async def test_correct_answer_finishes_round_and_grants_xp():
     owner_token, _member_token, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:

@@ -66,6 +66,15 @@ async def test_create_poll_one_option_422():
     assert r.status_code == 422
 
 
+async def test_plain_member_cannot_create_poll():
+    """Solo MODERATOR+ lanza encuestas; un MEMBER normal solo participa."""
+    _owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        r = await _create_poll(c, member_token, jukebox_id)
+    assert r.status_code == 403
+    assert r.json()["code"] == "insufficient_role"
+
+
 async def test_guest_cannot_create_poll():
     owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:

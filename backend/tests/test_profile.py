@@ -70,6 +70,12 @@ async def test_vote_and_poll_grants_xp():
             f"/api/v1/jukeboxes/{jukebox_id}/queue/{other_id}/vote",
             headers=auth(member_token),
         )
+        member_id = (await c.get("/api/v1/users/me", headers=auth(member_token))).json()["id"]
+        await c.patch(
+            f"/api/v1/jukeboxes/{jukebox_id}/members/{member_id}",
+            headers=auth(owner_token),
+            json={"role": "MODERATOR"},
+        )  # crear encuestas es cosa de MODERATOR+ (el oyente solo participa)
         poll = (
             await c.post(
                 f"/api/v1/jukeboxes/{jukebox_id}/polls",

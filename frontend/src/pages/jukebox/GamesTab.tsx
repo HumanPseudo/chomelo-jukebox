@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { games } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
 import { ApiError } from "../../lib/api";
-import type { RoundOut } from "../../lib/types";
+import { roleAtLeast, type RoundOut } from "../../lib/types";
 import { Button, Empty, Panel, Tag } from "../../components/ui";
 
 const GAME_KEY = "guess_the_song";
@@ -12,6 +12,7 @@ export function GamesTab() {
   const [rounds, setRounds] = useState<RoundOut[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const canModerate = roleAtLeast(jukebox.role, "MODERATOR");
 
   const reload = useCallback(async () => {
     setRounds(await games.list(jukebox.id, GAME_KEY));
@@ -60,10 +61,15 @@ export function GamesTab() {
           se elige al azar una canción ya reproducida en esta frecuencia. el primero en acertar
           gana puntos y créditos.
         </p>
-        {!open && (
+        {!open && canModerate && (
           <Button onClick={start} disabled={busy}>
             iniciar ronda
           </Button>
+        )}
+        {!open && !canModerate && (
+          <p style={{ color: "var(--dim)", fontSize: 13 }}>
+            esperando a que el admin lance una ronda
+          </p>
         )}
         {error && <p className="error-text">{error}</p>}
       </Panel>
