@@ -63,7 +63,22 @@ chomelo/
 docker compose up -d
 # API: http://localhost:8000  (docs: /docs)
 # Worker: http://localhost:9000/health
+# Frontend: http://localhost:5173
 ```
+
+## Frontend
+React + Vite + TypeScript, sin librería de UI (design system propio).
+Tema "Señal Pirata": consola de transmisión clandestina, sin degradados
+decorativos — cada color tiene un solo trabajo (ámbar = acción, cian =
+en vivo, rojo = alarma), esquinas cortadas en diagonal (`clip-path`) en
+vez de `border-radius`. Tipografías autohospedadas (`@fontsource`):
+Chakra Petch (UI) + JetBrains Mono (datos/números). Ver
+`frontend/src/styles/tokens.css`.
+- El WebSocket solo avisa (`queue.updated`, `player.updated`, etc.); los
+  datos siempre se re-sincronizan por REST — nunca confiar en el payload
+  del evento.
+- Panel `/jukeboxes/:id/admin` (reproductor + moderación de cola) solo
+  visible para MODERATOR+; el resto de miembros ve la cola en solo lectura.
 
 ## Modelo de datos: ver PLAN.md sección "Modelo de datos".
 ## Roadmap por fases: ver PLAN.md.

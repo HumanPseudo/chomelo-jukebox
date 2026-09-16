@@ -1,0 +1,34 @@
+/*
+  Chomelo — "Señal Pirata"
+  Consola de transmisión clandestina en una ciudad controlada por corporaciones.
+  Cada color tiene un solo trabajo: el ámbar es la acción, el cian es "en vivo",
+  el rojo es alarma. Sin degradados decorativos, sin esquinas redondeadas:
+  los cortes en diagonal evocan chapa de equipo de radio, no una tarjeta SaaS.
+*/
+
+:root {
+  --void: #14110c;
+  --panel: #1e1911;
+  --panel-raised: #26200f;
+  --signal: #f2b705;
+  --signal-dim: #8a6a12;
+  --frequency: #4dd6e8;
+  --alert: #e8433d;
+  --ink: #ece4d3;
+  --dim: #8a8371;
+  --line: #332c1c;
+
+  --font-display: "Chakra Petch", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --cut: 14px;
+  --cut-sm: 8px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+}

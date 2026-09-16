@@ -5,6 +5,20 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 18 — MVP COMPLETADO ✅.** Frontend React + Vite + TS, tema cyberpunk
+propio ("Señal Pirata": consola de transmisión clandestina, sin degradados
+tipo IA — colores con un solo trabajo cada uno, cortes en diagonal en vez
+de `border-radius`, tipografías autohospedadas Chakra Petch + JetBrains
+Mono). Login/registro, lista de jukeboxes (crear/unirse por código), vista
+de jukebox con cola en vivo (buscar/añadir/votar), reproductor de solo
+lectura para miembros, panel de Admin separado (`/jukeboxes/:id/admin`,
+MODERATOR+) con controles del reproductor (play/pause/next) y moderación
+de cola, encuestas, minijuego "adivina la canción", créditos (wallet) y
+perfil con XP/historial. WebSocket conectado (el evento solo avisa, los
+datos se re-sincronizan por REST). Verificado con Playwright real
+(capturas de cada vista, sin errores de consola) y en Docker (`docker
+compose up -d` levanta también el frontend en :5173).
+
 **FASE 14 — COMPLETADA ✅.** Tests de concurrencia contra Postgres real
 (Testcontainers) con `asyncio.gather` y sesiones/conexiones independientes
 simulando requests concurrentes: votos simultáneos, créditos/débitos de
@@ -825,9 +839,79 @@ GitHub Actions: lint → unit → integration → build → security scan → im
 ## FASE 17 — Deployment
 Deploy a VPS/servidor del usuario, dominios, TLS, backups de Postgres.
 
-## FASE 18 — Frontend (transversal, empezar tras Fase 5)
-SPA (React/Vite o Angular — decidir antes): Home, Login, Jukebox, Player, Queue,
-Search, Profile, Polls, Games, Wallet. Conexión WS en vivo.
+## FASE 18 — Frontend ✅ (MVP COMPLETADO)
+
+SPA (React/Vite): Home, Login, Jukebox, Player, Queue, Search, Profile,
+Polls, Games, Wallet. Conexión WS en vivo.
+
+**Dirección visual — "Señal Pirata":** una consola de transmisión
+clandestina en una ciudad controlada por corporaciones. Referencia
+investigada (no un look genérico de IA): identidad ámbar/negro tipo
+señalética de peligro (evitando el cliché de degradado morado/verde-ácido
+sobre negro), vocabulario del propio dominio (frecuencia, transmisión,
+señal) en vez de copy genérico.
+
+**Entregables (todos completados):**
+- [x] `frontend/` — Vite + React 19 + TypeScript, sin librería de UI
+- [x] `src/styles/tokens.css` — 8 tokens de color con un solo trabajo cada
+      uno (ámbar=acción, cian=en vivo, rojo=alarma, sin degradados
+      decorativos); dos tipografías autohospedadas (`@fontsource`):
+      Chakra Petch (UI) + JetBrains Mono (datos/números)
+- [x] `src/styles/global.css` — sistema de componentes propio: `.panel`
+      (esquinas cortadas con `clip-path`, nunca `border-radius`), `.btn`
+      (hexágono achatado), campos, indicadores de señal con pulso
+      (`prefers-reduced-motion` respetado)
+- [x] `src/lib/api.ts` — cliente fetch con JWT (access+refresh), reintento
+      automático de un 401 tras refrescar el token, `ApiError` tipado
+- [x] `src/lib/endpoints.ts` + `types.ts` — funciones y tipos que reflejan
+      1:1 los schemas Pydantic del backend
+- [x] `src/lib/auth.tsx` — `AuthProvider`/`useAuth`, `RequireAuth` para
+      rutas protegidas
+- [x] `src/lib/useJukeboxSocket.ts` — WS con reconexión automática
+      (backoff fijo 3s); **el evento solo dispara un refetch por REST**,
+      nunca se confía en su payload como estado (mismo principio que el
+      backend de Fase 12)
+- [x] `src/pages/` — Login, Register, JukeboxesHome (crear/unirse por
+      código), y bajo `/jukeboxes/:id`: Cola (buscar/añadir/votar +
+      reproductor de solo lectura), Encuestas, Adivina la canción,
+      Miembros (gestión de roles para ADMIN+), y **Admin** (solo
+      MODERATOR+: reproductor con play/pausa/siguiente + moderar cola)
+- [x] `src/pages/WalletView.tsx` y `ProfileView.tsx` — saldo/ledger y
+      perfil con XP/nivel/estadísticas/historial
+- [x] `frontend/Dockerfile` + servicio `frontend` en `docker-compose.yml`
+      (bind mount + volumen anónimo para `node_modules`, evita el choque
+      glibc/musl entre host y contenedor Alpine)
+- [x] Verificado con Playwright real (Chromium): registro → crear
+      frecuencia → cola → juego → encuestas → miembros → admin → créditos
+      → perfil → vista móvil, sin errores de consola
+
+**Verificación (ejecutada):**
+```bash
+docker compose up -d --build          # ✓ 5 servicios healthy (+ frontend)
+curl localhost:5173                    # ✓ 200
+# Playwright: registro real vía /api/v1/auth/register, navegación por
+# las 8 vistas, captura de pantalla de cada una (incluida móvil 390px)
+# sin CONSOLE ERROR ni PAGE ERROR.
+cd frontend && npx tsc -b              # ✓ sin errores de tipos
+cd frontend && npm run lint            # ✓ solo warnings de estilo (React
+                                        #   fast-refresh / set-state-in-effect,
+                                        #   esperables sin librería de fetching)
+```
+
+**Pendiente (diferido):** librería de fetching (react-query) si el MVP
+crece y el patrón `useEffect` + `useState` empieza a doler; página de
+detalle de pago/checkout (Fase 11 ya tiene el backend, falta el botón de
+compra); reconexión del WS con "último estado conocido" más agresiva;
+tests de componentes (Vitest/Testing Library) — no había suite de frontend
+previa que mantener, se puede sumar cuando el UI se estabilice.
+
+**Conceptos que se aprenden:** un sistema de diseño con tokens con
+significado (no "azul porque sí") evita el look genérico; WebSocket como
+aviso puro y REST como única fuente de verdad también aplica en el
+cliente, no solo en el servidor; separar el panel de control (Admin) de
+la vista de miembro no es solo un `if` de permisos — es una ruta y una
+experiencia distintas; `clip-path` como alternativa consistente a
+`border-radius` para una identidad visual que no se parece a un kit SaaS.
 
 ---
 

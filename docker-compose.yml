@@ -62,5 +62,17 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/code
+      - /code/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
