@@ -8,13 +8,17 @@ export function PlayerReadout({
   item,
   player,
   controls,
+  withAudio = false,
 }: {
   item: QueueItemOut | undefined;
   player: PlayerStateOut;
   controls?: ReactNode;
+  /** Solo el dispositivo conectado a las bocinas (el admin) reproduce
+   * audio de verdad; los oyentes solo ven el estado sincronizado. */
+  withAudio?: boolean;
 }) {
   const [positionMs, setPositionMs] = useState(player.position_ms);
-  const { audioRef, locked, unlock } = useAudioSync(item, player);
+  const { audioRef, locked, unlock } = useAudioSync(item, player, withAudio);
 
   useEffect(() => {
     setPositionMs(player.position_ms);
@@ -25,7 +29,7 @@ export function PlayerReadout({
     return () => clearInterval(timer);
   }, [player.position_ms, player.is_playing]);
 
-  const audioTag = <audio ref={audioRef} preload="auto" />;
+  const audioTag = withAudio ? <audio ref={audioRef} preload="auto" /> : null;
 
   if (!item) {
     return (
@@ -69,7 +73,7 @@ export function PlayerReadout({
           <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
         </div>
       </div>
-      {player.is_playing && locked && (
+      {withAudio && player.is_playing && locked && (
         <Button size="sm" onClick={unlock}>
           🔇 activar sonido
         </Button>

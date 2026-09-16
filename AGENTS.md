@@ -79,6 +79,10 @@ Chakra Petch (UI) + JetBrains Mono (datos/números). Ver
   del evento.
 - Panel `/jukeboxes/:id/admin` (reproductor + moderación de cola) solo
   visible para MODERATOR+; el resto de miembros ve la cola en solo lectura.
+- Jukebox física real: solo el dispositivo del admin (conectado a las
+  bocinas) reproduce audio de verdad (`useAudioSync`, `withAudio` en
+  `PlayerReadout`); los oyentes normales solo ven el estado sincronizado,
+  nunca intentan transmitir sonido por su propio navegador.
 
 ## Modelo de datos: ver PLAN.md sección "Modelo de datos".
 ## Roadmap por fases: ver PLAN.md.

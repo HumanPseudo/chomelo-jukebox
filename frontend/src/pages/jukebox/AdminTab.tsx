@@ -44,6 +44,7 @@ export function AdminTab() {
         <PlayerReadout
           item={playing}
           player={data.player}
+          withAudio
           controls={
             <div className="player__controls">
               {data.player.is_playing ? (

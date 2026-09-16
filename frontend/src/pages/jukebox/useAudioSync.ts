@@ -7,10 +7,13 @@ const DRIFT_TOLERANCE_MS = 2000;
 /**
  * Conecta el elemento <audio> real con el track_id resuelto por el worker
  * (stream efímero) y lo mantiene sincronizado con la posición autoritativa
- * del servidor. Los navegadores bloquean el autoplay con sonido sin un
- * gesto del usuario, así que expone `locked`/`unlock` para pedirlo.
+ * del servidor. Es un jukebox físico: solo el dispositivo del admin (el
+ * que está conectado a las bocinas) reproduce audio de verdad — por eso
+ * `enabled` viene en false para los oyentes, que solo ven el estado.
+ * Los navegadores bloquean el autoplay con sonido sin un gesto del
+ * usuario, así que expone `locked`/`unlock` para pedirlo.
  */
-export function useAudioSync(item: QueueItemOut | undefined, player: PlayerStateOut) {
+export function useAudioSync(item: QueueItemOut | undefined, player: PlayerStateOut, enabled: boolean) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [locked, setLocked] = useState(false);
   const loadedTrackId = useRef<string | null>(null);
@@ -24,7 +27,27 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
       .catch(() => setLocked(true));
   }
 
+  // Además de la promesa de cada intento puntual, se escucha el propio
+  // elemento <audio>: si queda en pausa mientras el servidor dice que
+  // debería estar sonando (p.ej. el navegador lo pausó solo al volver de
+  // segundo plano), el botón "activar sonido" tiene que reaparecer sin
+  // depender de un intento explícito que lo capte.
   useEffect(() => {
+    if (!enabled) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onPause = () => setLocked(player.is_playing);
+    const onPlay = () => setLocked(false);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("play", onPlay);
+    return () => {
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("play", onPlay);
+    };
+  }, [enabled, player.is_playing]);
+
+  useEffect(() => {
+    if (!enabled) return;
     if (!item) {
       loadedTrackId.current = null;
       const audio = audioRef.current;
@@ -52,9 +75,10 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
         // el readout sigue mostrando el estado, sin audio.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.track_id]);
+  }, [enabled, item?.track_id]);
 
   useEffect(() => {
+    if (!enabled) return;
     const audio = audioRef.current;
     if (!audio || !item || !audio.src) return;
     if (player.is_playing) {
@@ -66,7 +90,7 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
       audio.pause();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player.is_playing, player.position_ms, item?.id]);
+  }, [enabled, player.is_playing, player.position_ms, item?.id]);
 
   return { audioRef, locked, unlock: attemptPlay };
 }
