@@ -5,6 +5,12 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 11 — COMPLETADA ✅.** Micropagos: `PaymentProvider` (ABC, Stripe +
+mock de desarrollo), checkout, webhook con verificación de firma e idempotencia
+(evento UNIQUE `provider_event_id`), flujo PENDING→PROCESSED→CREDITS_GRANTED y
+abono a la wallet con idempotency key. Verificado con Postgres real.
+130 tests verdes. Migración `0009_payments`.
+
 **FASE 10 — COMPLETADA ✅.** Wallet + ledger append-only: `credit`/`debit` con
 FOR UPDATE + idempotency keys deterministas, recompensas por acciones (añadir,
 reproducir, votos, encuestas, ganar ronda) abonadas vía wallet, endpoints de
@@ -523,10 +529,57 @@ idempotencia determinista por evento (el reintento es un no-op seguro), `ON
 CONFLICT DO NOTHING` portátil entre SQLite y Postgres, "el servidor abona, el
 cliente nunca" como principio de economía segura.
 
-## FASE 11 — Micropagos
-`PaymentProvider` (ABC) + implementación (Stripe o equivalente),
-checkout, webhook con verificación de firma, idempotencia de eventos,
-flujo PENDING→PROCESSED→CREDITS_GRANTED.
+## FASE 11 — Micropagos ✅ (COMPLETADA)
+`PaymentProvider` (ABC) + implementación (Stripe), checkout, webhook con
+verificación de firma, idempotencia de eventos, flujo
+PENDING→PROCESSED→CREDITS_GRANTED.
+
+**Entregables (todos completados):**
+- [x] `backend/app/providers/payments.py` — `PaymentProvider` (ABC) con
+      `create_checkout` y `verify_event` (normaliza a `ProviderEvent`
+      independiente del vendor): `StripePaymentProvider` (SDK Stripe, verifica
+      firma con `Webhook.construct_event`) y `MockPaymentProvider` SOLO dev
+      (sin credenciales, para desarrollo/verificación)
+- [x] `backend/app/core/config.py` — `payment_provider` (mock/stripe),
+      `stripe_secret_key`, `stripe_webhook_secret`, `cents_per_credit` (10)
+- [x] `backend/app/domain/payment.py` — `Payment` (PENDING/PROCESSED/
+      CREDITS_GRANTED/FAILED) y `PaymentEvent` con `provider_event_id` UNIQUE
+      (regla dura #3); migración `0009_payments`
+- [x] `backend/app/services/payment_service.py` — `create_checkout` (créditos
+      5-10000, precio cents), `consume_webhook` (firma → idempotencia por evento
+      → crédito de wallet con idempotency clave `payment:{provider}:{session}` →
+      CREDITS_GRANTED; evento desconocido = seguro, sin crédito), `list_payments`
+- [x] `backend/app/api/routes/payments.py` — `POST /payments/webhook` (público),
+      `POST /users/me/payments/checkout` (201) y `GET /users/me/payments`;
+      `get_payment_provider` como dependency inyectable en tests
+- [x] `backend/tests/test_payments.py` — 8 tests (auth 401, firma inválida 400,
+      checkout PENDING + precio, importe fuera de rango 422, webhook concede una
+      vez, evento duplicado no duplica crédito, evento nuevo misma sesión no
+      duplica, sesión desconocida segura)
+
+**Verificación (ejecutada, Postgres real + proveedor mock):**
+```bash
+docker compose exec backend alembic upgrade head   # ✓ 0008_wallet -> 0009_payments
+POST /users/me/payments/checkout {credits:500}    # ✓ 201 PENDING, cents 5000
+POST /payments/webhook (firma test)                # ✓ {"received":true}
+POST webhook mismo evento                          # ✓ {"duplicate":true}
+POST webhook con firma mala                        # ✓ 400 invalid_signature
+GET /users/me/payments                             # ✓ CREDITS_GRANTED
+GET /users/me/wallet                               # ✓ 6 -> 506, ledger "payment" +500
+cd backend && uv run pytest -q                     # ✓ 130 passed (8 nuevos)
+cd backend && uv run ruff check . && ruff format   # ✓ limpio
+```
+
+**Pendiente (diferido):** claves/modo real de Stripe en `.env` de producción;
+URL de éxito/cancelación reales del frontend; reembolsos; avisos al usuario por
+WebSockets (Fase 12); gastar créditos en ítems/ventajas.
+
+**Conceptos que se aprenden:** proveedor de pagos tras una interfaz intercambiable
+(migrar Stripe por otro proveedor no toca el dominio), webhook como la ÚNICA fuente
+de verdad del pago (el cliente nunca dice "pagué"), verificación de firma con el
+payload crudo (nunca re-serializar antes de verificar), doble capa de idempotencia
+(evento UNIQUE + wallet idempotency key), los 200 idempotentes evitan reintentos
+sin fin del proveedor.
 
 ## FASE 12 — WebSockets
 Canales por jukebox `/ws/jukebox/{id}`, broadcast de cola/player/votos/polls/juegos,

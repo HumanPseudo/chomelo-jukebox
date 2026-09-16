@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 15
     jwt_refresh_expire_days: int = 7
 
+    # Pagos: "mock" en desarrollo sin credenciales; "stripe" en producción.
+    payment_provider: str = "mock"
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    cents_per_credit: int = 10
+
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
 

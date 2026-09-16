@@ -13,6 +13,7 @@ from app.api.deps import get_clock, get_music_provider
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.providers.payments import get_payment_provider
 
 _test_engine = create_async_engine(
     "sqlite+aiosqlite://",
@@ -34,6 +35,7 @@ async def _reset_db():
         await conn.run_sync(Base.metadata.create_all)
     app.dependency_overrides.pop(get_music_provider, None)
     app.dependency_overrides.pop(get_clock, None)
+    app.dependency_overrides.pop(get_payment_provider, None)
     yield
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
