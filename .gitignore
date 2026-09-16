@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env & secrets
+.env
+*.env.local
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Editor
+.idea/
+.vscode/
+*.swp

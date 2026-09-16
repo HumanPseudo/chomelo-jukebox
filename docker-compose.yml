@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: chomelo
+      POSTGRES_PASSWORD: chomelo
+      POSTGRES_DB: chomelo
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chomelo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/code
+    ports:
+      - "8000:8000"
+    environment:
+      CHOMELO_ENVIRONMENT: development
+      CHOMELO_DATABASE_URL: postgresql+asyncpg://chomelo:chomelo@db:5432/chomelo
+      CHOMELO_REDIS_URL: redis://redis:6379/0
+      CHOMELO_WORKER_URL: http://worker:9000
+      CHOMELO_JWT_SECRET: dev-secret-key-change-in-prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build: ./worker
+    command: uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+    volumes:
+      - ./worker:/code
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:9000/health', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
