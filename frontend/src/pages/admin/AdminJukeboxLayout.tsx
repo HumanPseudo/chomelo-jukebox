@@ -3,7 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useParams } from "react-router-dom";
 import { jukeboxes } from "../../lib/endpoints";
 import { JukeboxProvider } from "../../lib/jukeboxContext";
 import { useJukeboxSocket } from "../../lib/useJukeboxSocket";
-import { roleAtLeast, type JukeboxOut, type WsEvent } from "../../lib/types";
+import type { JukeboxOut, WsEvent } from "../../lib/types";
 import { Empty, SignalDot } from "../../components/ui";
 
 function tabClass({ isActive }: { isActive: boolean }) {
@@ -29,7 +29,7 @@ export function AdminJukeboxLayout() {
 
   if (!jukebox) return <Empty>sintonizando…</Empty>;
 
-  if (!roleAtLeast(jukebox.role, "MODERATOR")) {
+  if (jukebox.role !== "ADMIN") {
     return <Navigate to="/" replace />;
   }
 

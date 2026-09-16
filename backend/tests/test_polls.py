@@ -32,11 +32,6 @@ async def _get(client: AsyncClient, token: str, jukebox_id: int, poll_id: int) -
     ).json()
 
 
-async def _member_user_id(client: AsyncClient, owner_token: str, member_token: str) -> int:
-    me = await client.get("/api/v1/users/me", headers=auth(member_token))
-    return me.json()["id"]
-
-
 # ---------- creación y permisos ----------
 
 
@@ -70,20 +65,6 @@ async def test_plain_member_cannot_create_poll():
     """Solo MODERATOR+ lanza encuestas; un MEMBER normal solo participa."""
     _owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:
-        r = await _create_poll(c, member_token, jukebox_id)
-    assert r.status_code == 403
-    assert r.json()["code"] == "insufficient_role"
-
-
-async def test_guest_cannot_create_poll():
-    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
-    async with AsyncClient(transport=transport, base_url=BASE) as c:
-        uid = await _member_user_id(c, owner_token, member_token)
-        await c.patch(
-            f"/api/v1/jukeboxes/{jukebox_id}/members/{uid}",
-            headers=auth(owner_token),
-            json={"role": "GUEST"},
-        )
         r = await _create_poll(c, member_token, jukebox_id)
     assert r.status_code == 403
     assert r.json()["code"] == "insufficient_role"

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/jukeboxes", tags=["jukebox", "poll"])
 async def create_poll(
     jukebox_id: int,
     payload: PollCreate,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> PollOut:
     return await poll_service.create_poll(db, member, payload)
@@ -47,7 +47,7 @@ async def cast_vote(
     jukebox_id: int,
     poll_id: int,
     payload: PollVoteRequest,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await poll_service.cast_vote(db, member, poll_id, payload.option_id)
@@ -58,7 +58,7 @@ async def close_poll(
     jukebox_id: int,
     poll_id: int,
     request: Request,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> PollOut:
     result = await poll_service.close_poll(db, member, poll_id)
@@ -80,7 +80,7 @@ async def delete_poll(
     jukebox_id: int,
     poll_id: int,
     request: Request,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await poll_service.delete_poll(db, member, poll_id)

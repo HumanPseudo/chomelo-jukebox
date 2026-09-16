@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { games } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
 import { ApiError } from "../../lib/api";
-import { roleAtLeast, type RoundOut } from "../../lib/types";
+import type { RoundOut } from "../../lib/types";
 import { Button, Empty, Panel, Tag } from "../../components/ui";
 
 const GAME_KEY = "guess_the_song";
@@ -12,7 +12,7 @@ export function GamesTab() {
   const [rounds, setRounds] = useState<RoundOut[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const canModerate = roleAtLeast(jukebox.role, "MODERATOR");
+  const canModerate = jukebox.role === "ADMIN";
 
   const reload = useCallback(async () => {
     setRounds(await games.list(jukebox.id, GAME_KEY));

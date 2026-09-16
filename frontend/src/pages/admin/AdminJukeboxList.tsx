@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jukeboxes } from "../../lib/endpoints";
-import { roleAtLeast, type JukeboxOut } from "../../lib/types";
+import type { JukeboxOut } from "../../lib/types";
 import { Empty, Panel, Tag } from "../../components/ui";
 
 export function AdminJukeboxList() {
@@ -12,7 +12,7 @@ export function AdminJukeboxList() {
     jukeboxes.list().then(setList);
   }, []);
 
-  const consoles = list?.filter((jb) => roleAtLeast(jb.role, "MODERATOR"));
+  const consoles = list?.filter((jb) => jb.role === "ADMIN");
 
   return (
     <div>

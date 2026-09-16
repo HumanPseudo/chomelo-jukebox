@@ -86,7 +86,7 @@ async def update_jukebox(
 @router.delete("/{jukebox_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_jukebox(
     request: Request,
-    member: JukeboxMember = Depends(require_role(Role.OWNER)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await jukebox_service.delete_jukebox(db, member)
@@ -123,7 +123,7 @@ async def set_member_role(
     user_id: int,
     payload: RoleUpdate,
     request: Request,
-    actor: JukeboxMember = Depends(get_membership),
+    actor: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> MemberOut:
     updated = await jukebox_service.set_member_role(
@@ -146,7 +146,7 @@ async def set_member_role(
 async def remove_jukebox_member(
     user_id: int,
     request: Request,
-    actor: JukeboxMember = Depends(get_membership),
+    actor: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await jukebox_service.remove_member(db, actor, actor.jukebox_id, user_id)

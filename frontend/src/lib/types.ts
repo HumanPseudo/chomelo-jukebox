@@ -37,19 +37,8 @@ export interface ListenHistoryItem {
   played_at: string;
 }
 
-export type Role = "OWNER" | "ADMIN" | "MODERATOR" | "MEMBER" | "GUEST";
-
-export const ROLE_RANK: Record<Role, number> = {
-  OWNER: 100,
-  ADMIN: 90,
-  MODERATOR: 70,
-  MEMBER: 50,
-  GUEST: 30,
-};
-
-export function roleAtLeast(role: Role, min: Role): boolean {
-  return ROLE_RANK[role] >= ROLE_RANK[min];
-}
+// Solo dos roles: ADMIN administra, MEMBER (oyente) participa.
+export type Role = "ADMIN" | "MEMBER";
 
 export interface JukeboxOut {
   id: number;

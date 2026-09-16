@@ -71,7 +71,7 @@ export function JukeboxesHome() {
                 {jb.member_count} en la señal · código {jb.invite_code}
               </span>
             </div>
-            <Tag live={jb.role === "OWNER" || jb.role === "ADMIN"}>{jb.role}</Tag>
+            <Tag live={jb.role === "ADMIN"}>{jb.role}</Tag>
           </Panel>
         ))}
       </div>

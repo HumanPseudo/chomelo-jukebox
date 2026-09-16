@@ -48,7 +48,7 @@ async def test_create_jukebox_ok():
         token = await _register(c, "owner@test.com")
         body = await _make_jukebox(c, token, "Fiesta")
     assert body["name"] == "Fiesta"
-    assert body["role"] == "OWNER"
+    assert body["role"] == "ADMIN"
     assert body["member_count"] == 1
     assert len(body["invite_code"]) == 6
 
@@ -153,7 +153,7 @@ async def test_update_jukebox_ok():
     assert r.json()["name"] == "Renombrado"
 
 
-async def test_delete_requires_owner():
+async def test_delete_requires_admin():
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         owner_token = await _register(c, "delowner@test.com")
         jb = await _make_jukebox(c, owner_token)
@@ -193,15 +193,32 @@ async def test_members_list():
         r = await c.get(f"/api/v1/jukeboxes/{jb['id']}/members", headers=_auth(owner_token))
     assert r.status_code == 200
     roles = {m["display_name"]: m["role"] for m in r.json()}
-    assert roles.get("staff") == "OWNER"
+    assert roles.get("staff") == "ADMIN"
     assert roles.get("staff2") == "MEMBER"
 
 
-async def test_admin_cannot_demote_owner():
+async def test_cannot_demote_last_admin():
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         owner_token = await _register(c, "boss@test.com")
         jb = await _make_jukebox(c, owner_token)
-        admin_token = await _register(c, "admin@test.com")
+        members = (
+            await c.get(f"/api/v1/jukeboxes/{jb['id']}/members", headers=_auth(owner_token))
+        ).json()
+        boss_uid = _member_uid(members, "boss")
+        r = await c.patch(
+            f"/api/v1/jukeboxes/{jb['id']}/members/{boss_uid}",
+            headers=_auth(owner_token),
+            json={"role": "MEMBER"},
+        )
+    assert r.status_code == 409
+    assert r.json()["code"] == "last_admin"
+
+
+async def test_admin_can_demote_another_admin_if_not_last():
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        owner_token = await _register(c, "boss2@test.com")
+        jb = await _make_jukebox(c, owner_token)
+        admin_token = await _register(c, "admin2@test.com")
         await c.post(
             "/api/v1/jukeboxes/join",
             headers=_auth(admin_token),
@@ -210,20 +227,22 @@ async def test_admin_cannot_demote_owner():
         members = (
             await c.get(f"/api/v1/jukeboxes/{jb['id']}/members", headers=_auth(owner_token))
         ).json()
-        admin_uid = _member_uid(members, "admin")
-        boss_uid = _member_uid(members, "boss")
+        admin_uid = _member_uid(members, "admin2")
+        boss_uid = _member_uid(members, "boss2")
         await c.patch(
             f"/api/v1/jukeboxes/{jb['id']}/members/{admin_uid}",
             headers=_auth(owner_token),
             json={"role": "ADMIN"},
         )
+        # con dos admins, uno puede bajar al otro a MEMBER sin dejar la
+        # jukebox huérfana de administración.
         r = await c.patch(
             f"/api/v1/jukeboxes/{jb['id']}/members/{boss_uid}",
             headers=_auth(admin_token),
             json={"role": "MEMBER"},
         )
-    assert r.status_code == 403
-    assert r.json()["code"] == "cannot_modify_member"
+    assert r.status_code == 200
+    assert r.json()["role"] == "MEMBER"
 
 
 async def test_member_cannot_promote_self():
@@ -248,34 +267,24 @@ async def test_member_cannot_promote_self():
     assert r.status_code == 403
 
 
-async def test_owner_transfer_ownership():
+async def test_role_update_rejects_unknown_role():
+    """OWNER/MODERATOR/GUEST ya no existen: el schema los rechaza (422)."""
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         owner_token = await _register(c, "tr1@test.com")
         jb = await _make_jukebox(c, owner_token)
-        new_owner_token = await _register(c, "tr2@test.com")
-        await c.post(
-            "/api/v1/jukeboxes/join",
-            headers=_auth(new_owner_token),
-            json={"invite_code": jb["invite_code"]},
-        )
         members = (
             await c.get(f"/api/v1/jukeboxes/{jb['id']}/members", headers=_auth(owner_token))
         ).json()
-        uid = _member_uid(members, "tr2")
+        uid = _member_uid(members, "tr1")
         r = await c.patch(
             f"/api/v1/jukeboxes/{jb['id']}/members/{uid}",
             headers=_auth(owner_token),
             json={"role": "OWNER"},
         )
-        detail = (
-            await c.get(f"/api/v1/jukeboxes/{jb['id']}", headers=_auth(new_owner_token))
-        ).json()
-    assert r.status_code == 200
-    assert r.json()["role"] == "OWNER"
-    assert detail["owner_id"] == uid
+    assert r.status_code == 422
 
 
-async def test_admin_promotes_member_to_moderator():
+async def test_any_admin_promotes_member_to_admin():
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         owner_token = await _register(c, "ap@test.com")
         jb = await _make_jukebox(c, owner_token)
@@ -304,13 +313,15 @@ async def test_admin_promotes_member_to_moderator():
             await c.get(f"/api/v1/jukeboxes/{jb['id']}/members", headers=_auth(admin_token))
         ).json()
         uid = _member_uid(members, "ap3")
+        # ap2 (promovido por ap, no el creador) también tiene poder de
+        # admin completo: no hay jerarquía por debajo de ADMIN.
         r = await c.patch(
             f"/api/v1/jukeboxes/{jb['id']}/members/{uid}",
             headers=_auth(admin_token),
-            json={"role": "MODERATOR"},
+            json={"role": "ADMIN"},
         )
     assert r.status_code == 200
-    assert r.json()["role"] == "MODERATOR"
+    assert r.json()["role"] == "ADMIN"
 
 
 async def test_remove_member_ok():

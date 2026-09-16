@@ -63,21 +63,6 @@ async def test_boost_item_not_found_404():
     assert r.json()["code"] == "queue_item_not_found"
 
 
-async def test_guest_cannot_boost():
-    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
-    async with AsyncClient(transport=transport, base_url=BASE) as c:
-        item = (await add_item(c, owner_token, jukebox_id, "abc")).json()
-        me = (await c.get("/api/v1/users/me", headers=auth(member_token))).json()
-        await c.patch(
-            f"/api/v1/jukeboxes/{jukebox_id}/members/{me['id']}",
-            headers=auth(owner_token),
-            json={"role": "GUEST"},
-        )
-        r = await _boost(c, member_token, jukebox_id, item["id"], 1)
-    assert r.status_code == 403
-    assert r.json()["code"] == "insufficient_role"
-
-
 async def test_boost_recorded_in_wallet_ledger():
     owner_token, _member, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:

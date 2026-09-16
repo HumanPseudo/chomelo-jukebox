@@ -244,21 +244,3 @@ async def test_round_expires_automatically():
     assert answer.status_code == 409
     assert answer.json()["code"] == "round_finished"
     assert any(r["id"] == round_["id"] for r in finished.json())
-
-
-async def test_guest_cannot_play_game():
-    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
-    async with AsyncClient(transport=transport, base_url=BASE) as c:
-        await _play_songs(c, owner_token, jukebox_id, 4)
-        members = (
-            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/members", headers=auth(owner_token))
-        ).json()
-        guest = next(m for m in members if m["display_name"] != "vowner")
-        await c.patch(
-            f"/api/v1/jukeboxes/{jukebox_id}/members/{guest['user_id']}",
-            headers=auth(owner_token),
-            json={"role": "GUEST"},
-        )
-        r = await c.post(f"{_game_path(jukebox_id)}/rounds", headers=auth(member_token), json={})
-    assert r.status_code == 403
-    assert r.json()["code"] == "insufficient_role"

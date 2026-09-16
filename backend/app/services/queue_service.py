@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
-from app.domain.jukebox import JukeboxMember, Role, role_rank
+from app.domain.jukebox import JukeboxMember, Role
 from app.domain.queue import Player, QueueItem, QueueStatus
 from app.domain.vote import Vote
 from app.infra.events import notify_jukebox
@@ -184,7 +184,7 @@ async def remove_item(db: AsyncSession, actor: JukeboxMember, item_id: int) -> N
         raise AppError(
             "solo se pueden quitar ítems en cola", code="item_not_removable", status_code=409
         )
-    can_moderate = role_rank(Role(actor.role)) >= role_rank(Role.MODERATOR)
+    can_moderate = Role(actor.role) is Role.ADMIN
     if not can_moderate and item.added_by != actor.user_id:
         raise AppError("permiso insuficiente", code="insufficient_role", status_code=403)
 

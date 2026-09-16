@@ -11,7 +11,7 @@ from app.api.schemas.jukebox import (
     MemberOut,
 )
 from app.core.exceptions import AppError
-from app.domain.jukebox import Jukebox, JukeboxMember, Role, role_rank
+from app.domain.jukebox import Jukebox, JukeboxMember, Role
 from app.domain.user import User
 
 _ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # sin caracteres ambiguos (O, 0, I, 1)
@@ -52,7 +52,7 @@ async def create_jukebox(db: AsyncSession, user: User, payload: JukeboxCreate) -
         owner_id=user.id,
         invite_code=await _unique_invite_code(db),
     )
-    jukebox.members.append(JukeboxMember(user_id=user.id, role=Role.OWNER.value))
+    jukebox.members.append(JukeboxMember(user_id=user.id, role=Role.ADMIN.value))
     db.add(jukebox)
     await db.commit()
     await db.refresh(jukebox)
@@ -64,7 +64,7 @@ async def create_jukebox(db: AsyncSession, user: User, payload: JukeboxCreate) -
         invite_code=jukebox.invite_code,
         is_active=jukebox.is_active,
         created_at=jukebox.created_at,
-        role=Role.OWNER.value,
+        role=Role.ADMIN.value,
         member_count=1,
     )
 
@@ -196,12 +196,18 @@ async def list_members(db: AsyncSession, jukebox_id: int) -> list[MemberOut]:
     ]
 
 
-def _can_manage(actor_role: Role, target_role: Role) -> bool:
-    if actor_role is Role.OWNER:
-        return True
-    if role_rank(target_role) >= role_rank(actor_role):
-        return False
-    return True
+async def _count_admins(db: AsyncSession, jukebox_id: int) -> int:
+    total = (
+        await db.execute(
+            select(func.count())
+            .select_from(JukeboxMember)
+            .where(
+                JukeboxMember.jukebox_id == jukebox_id,
+                JukeboxMember.role == Role.ADMIN.value,
+            )
+        )
+    ).scalar_one()
+    return int(total)
 
 
 async def set_member_role(
@@ -211,7 +217,9 @@ async def set_member_role(
     target_user_id: int,
     new_role: Role,
 ) -> MemberOut:
-    actor_role = Role(actor.role)
+    # El route ya exige que `actor` sea ADMIN (require_role); con solo dos
+    # roles, cualquier ADMIN administra a cualquier otro miembro. La única
+    # red de seguridad es no dejar la jukebox sin ningún ADMIN.
     target = (
         await db.execute(
             select(JukeboxMember)
@@ -225,41 +233,13 @@ async def set_member_role(
     if target is None:
         raise AppError("el usuario no es miembro", code="member_not_found", status_code=404)
 
-    target_role = Role(target.role)
-    if not _can_manage(actor_role, target_role):
+    if (
+        Role(target.role) is Role.ADMIN
+        and new_role is Role.MEMBER
+        and await _count_admins(db, jukebox_id) <= 1
+    ):
         raise AppError(
-            "no puedes cambiar el rol de un miembro con rol igual o superior",
-            code="cannot_modify_member",
-            status_code=403,
-        )
-    if role_rank(new_role) > role_rank(actor_role):
-        raise AppError(
-            "no puedes asignar un rol superior al tuyo",
-            code="cannot_assign_role",
-            status_code=403,
-        )
-    if new_role is Role.OWNER:
-        if target_role is Role.OWNER:
-            raise AppError(
-                "el jukebox ya tiene un propietario", code="owner_exists", status_code=409
-            )
-        previous = (
-            await db.execute(
-                select(JukeboxMember).where(
-                    JukeboxMember.jukebox_id == jukebox_id,
-                    JukeboxMember.role == Role.OWNER.value,
-                )
-            )
-        ).scalar_one_or_none()
-        if previous is not None:
-            previous.role = Role.MEMBER.value
-        actor.jukebox.owner_id = target.user_id
-        target.role = Role.OWNER.value
-        await db.commit()
-        return MemberOut(
-            user_id=target_user_id,
-            role=Role.OWNER.value,
-            display_name=_display(target),
+            "la jukebox se quedaría sin ningún admin", code="last_admin", status_code=409
         )
 
     target.role = new_role.value
@@ -280,7 +260,6 @@ def _display(member: JukeboxMember) -> str:
 async def remove_member(
     db: AsyncSession, actor: JukeboxMember, jukebox_id: int, target_user_id: int
 ) -> None:
-    actor_role = Role(actor.role)
     target = (
         await db.execute(
             select(JukeboxMember).where(
@@ -292,12 +271,9 @@ async def remove_member(
     if target is None:
         raise AppError("el usuario no es miembro", code="member_not_found", status_code=404)
 
-    target_role = Role(target.role)
-    if not _can_manage(actor_role, target_role):
+    if Role(target.role) is Role.ADMIN and await _count_admins(db, jukebox_id) <= 1:
         raise AppError(
-            "no puedes eliminar un miembro con rol igual o superior",
-            code="cannot_modify_member",
-            status_code=403,
+            "la jukebox se quedaría sin ningún admin", code="last_admin", status_code=409
         )
     await db.delete(target)
     await db.commit()

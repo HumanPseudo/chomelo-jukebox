@@ -14,17 +14,6 @@ async def _queue(client: AsyncClient, token: str, jukebox_id: int) -> dict:
     return (await client.get(f"/api/v1/jukeboxes/{jukebox_id}/queue", headers=auth(token))).json()
 
 
-async def _demote_to_guest(
-    client: AsyncClient, owner_token: str, jukebox_id: int, user_id: int
-) -> None:
-    r = await client.patch(
-        f"/api/v1/jukeboxes/{jukebox_id}/members/{user_id}",
-        headers=auth(owner_token),
-        json={"role": "GUEST"},
-    )
-    assert r.status_code == 200
-
-
 async def _member_user_id(
     client: AsyncClient, owner_token: str, jukebox_id: int, member_token: str
 ) -> int:
@@ -39,17 +28,6 @@ async def test_vote_requires_auth():
     async with AsyncClient(transport=transport, base_url=BASE) as c:
         r = await c.post("/api/v1/jukeboxes/1/queue/1/vote")
     assert r.status_code == 401
-
-
-async def test_guest_cannot_vote():
-    owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
-    async with AsyncClient(transport=transport, base_url=BASE) as c:
-        await add_item(c, owner_token, jukebox_id, "aaa")
-        uid = await _member_user_id(c, owner_token, jukebox_id, member_token)
-        await _demote_to_guest(c, owner_token, jukebox_id, uid)
-        r = await c.post(f"/api/v1/jukeboxes/{jukebox_id}/queue/1/vote", headers=auth(member_token))
-    assert r.status_code == 403
-    assert r.json()["code"] == "insufficient_role"
 
 
 async def test_vote_non_member_404():

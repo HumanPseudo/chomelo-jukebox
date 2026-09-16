@@ -60,7 +60,7 @@ async def _make_jukebox(db: AsyncSession, owner: User) -> Jukebox:
     jb = Jukebox(name="Concurrency", owner_id=owner.id, invite_code=secrets.token_hex(3).upper())
     db.add(jb)
     await db.flush()
-    db.add(JukeboxMember(jukebox_id=jb.id, user_id=owner.id, role=Role.OWNER.value))
+    db.add(JukeboxMember(jukebox_id=jb.id, user_id=owner.id, role=Role.ADMIN.value))
     await db.flush()
     return jb
 

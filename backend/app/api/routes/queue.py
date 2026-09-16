@@ -69,7 +69,7 @@ async def get_queue(
 async def add_to_queue(
     jukebox_id: int,
     payload: QueueAdd,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
     provider: MusicProvider = Depends(get_music_provider),
 ) -> QueueItemOut:
@@ -103,7 +103,7 @@ async def move_queue_item(
     jukebox_id: int,
     item_id: int,
     payload: ItemMove,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> QueueItemOut:
     item = await queue_service.move_item(db, member, item_id, payload.position)
@@ -124,7 +124,7 @@ async def get_history(
 @router.post("/{jukebox_id}/player/play", status_code=status.HTTP_204_NO_CONTENT)
 async def player_play(
     jukebox_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.player_play(db, member.jukebox_id)
@@ -133,7 +133,7 @@ async def player_play(
 @router.post("/{jukebox_id}/player/pause", status_code=status.HTTP_204_NO_CONTENT)
 async def player_pause(
     jukebox_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.player_pause(db, member.jukebox_id)
@@ -142,7 +142,7 @@ async def player_pause(
 @router.post("/{jukebox_id}/player/resume", status_code=status.HTTP_204_NO_CONTENT)
 async def player_resume(
     jukebox_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.player_resume(db, member.jukebox_id)
@@ -151,7 +151,7 @@ async def player_resume(
 @router.post("/{jukebox_id}/player/next", status_code=status.HTTP_204_NO_CONTENT)
 async def player_next(
     jukebox_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.player_skip(db, member.jukebox_id)
@@ -161,7 +161,7 @@ async def player_next(
 async def player_seek(
     jukebox_id: int,
     payload: SeekRequest,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.player_seek(db, member.jukebox_id, payload.position_ms)
@@ -174,7 +174,7 @@ async def player_seek(
 async def cast_vote(
     jukebox_id: int,
     item_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await vote_service.cast_vote(db, member, item_id)
@@ -184,7 +184,7 @@ async def cast_vote(
 async def remove_vote(
     jukebox_id: int,
     item_id: int,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await vote_service.remove_vote(db, member, item_id)
@@ -199,7 +199,7 @@ async def boost_item(
     item_id: int,
     payload: BoostRequest,
     request: Request,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
 ) -> QueueItemOut:
     item = await queue_service.boost_item(db, member, item_id, payload.credits)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { polls } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
-import { roleAtLeast, type PollOut } from "../../lib/types";
+import type { PollOut } from "../../lib/types";
 import { Button, Empty, Field, Input, Panel, Tag } from "../../components/ui";
 
 export function PollsTab() {
@@ -9,7 +9,7 @@ export function PollsTab() {
   const [list, setList] = useState<PollOut[] | null>(null);
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const canModerate = roleAtLeast(jukebox.role, "MODERATOR");
+  const canModerate = jukebox.role === "ADMIN";
 
   const reload = useCallback(async () => {
     setList(await polls.list(jukebox.id));

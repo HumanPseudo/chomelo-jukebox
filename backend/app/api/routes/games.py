@@ -22,7 +22,7 @@ async def create_round(
     jukebox_id: int,
     game_key: str,
     payload: RoundStartRequest,
-    member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
     clock: Callable[[], datetime] = Depends(get_clock),
 ) -> RoundOut:
@@ -68,7 +68,7 @@ async def answer_round(
     game_key: str,
     round_id: int,
     payload: AnswerRequest,
-    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
     clock: Callable[[], datetime] = Depends(get_clock),
 ) -> AttemptOut:

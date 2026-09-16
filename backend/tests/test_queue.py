@@ -126,25 +126,6 @@ async def test_add_invalid_track_502():
     assert r.json()["code"] == "music_provider_error"
 
 
-async def test_guest_cannot_add():
-    owner_token, member_token, jukebox_id, _code = await _make_jukebox_x2()
-    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
-        members = (
-            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/members", headers=_auth(owner_token))
-        ).json()
-        member_uid = next(m["user_id"] for m in members if m["display_name"] == "qmember")
-        for m in members:
-            if m["user_id"] == member_uid:
-                await c.patch(
-                    f"/api/v1/jukeboxes/{jukebox_id}/members/{m['user_id']}",
-                    headers=_auth(owner_token),
-                    json={"role": "GUEST"},
-                )
-        r = await _add(c, member_token, jukebox_id, "nope")
-    assert r.status_code == 403
-    assert r.json()["code"] == "insufficient_role"
-
-
 # ---------- player ----------
 
 

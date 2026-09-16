@@ -8,7 +8,7 @@ from starlette.websockets import WebSocketState
 
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.domain.jukebox import JukeboxMember, Role
+from app.domain.jukebox import JukeboxMember
 from app.domain.user import User
 from app.infra.ws_manager import ws_manager
 
@@ -52,7 +52,7 @@ async def ws_jukebox(
         )
     )
     member = result.scalar_one_or_none()
-    if member is None or member.role == Role.GUEST.value:
+    if member is None:
         await websocket.close(code=4403)
         return
 

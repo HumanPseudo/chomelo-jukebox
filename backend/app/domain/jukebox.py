@@ -10,19 +10,17 @@ from app.domain.user import User
 
 
 class Role(StrEnum):
-    OWNER = "OWNER"
+    """Solo dos roles: ADMIN administra (reproductor, cola, encuestas,
+    minijuegos, miembros), MEMBER (oyente) participa. `Jukebox.owner_id`
+    guarda quién la creó, pero no da poderes por encima de otro ADMIN."""
+
     ADMIN = "ADMIN"
-    MODERATOR = "MODERATOR"
     MEMBER = "MEMBER"
-    GUEST = "GUEST"
 
 
 _ROLE_RANK = {
-    Role.OWNER: 100,
-    Role.ADMIN: 90,
-    Role.MODERATOR: 70,
+    Role.ADMIN: 100,
     Role.MEMBER: 50,
-    Role.GUEST: 30,
 }
 
 

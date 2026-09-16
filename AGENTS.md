@@ -28,7 +28,12 @@ Módulos con límites claros bajo `backend/app/`:
    `MusicProvider` es una interfaz; `YtDlpMusicProvider` es una implementación.
 5. No almacenar audio. Solo metadata + stream URLs efímeras.
 6. API versionada: todo bajo `/api/v1`.
-7. Autorización por rol de jukebox: OWNER > ADMIN > MODERATOR > MEMBER > GUEST.
+7. Autorización por rol de jukebox: solo dos roles, **ADMIN** (administra:
+   reproductor, cola, encuestas, minijuegos, miembros) y **MEMBER**/oyente
+   (participa: vota, añade canciones, impulsa, responde). `owner_id` en
+   `Jukebox` es solo quién la creó, no da poderes por encima de otro ADMIN.
+   Única red de seguridad: no se puede dejar una jukebox sin ningún ADMIN
+   (`set_member_role`/`remove_member` devuelven 409 `last_admin`).
 8. Un voto por usuario por item: UNIQUE(queue_item_id, user_id).
 9. Errors: respuestas JSON consistentes {detail, code}. HTTP codes correctos.
 10. Cada fase debe dejar el sistema funcionando y con tests.
@@ -91,9 +96,9 @@ pisen. El servicio `admin` de `docker-compose.yml` pasa
   del evento.
 - La consola de admin (`AdminApp` → pestaña "Consola" = `AdminTab.tsx`,
   reproductor + moderación de cola) solo es alcanzable si el usuario
-  tiene rol MODERATOR+ en esa jukebox (si no, `AdminJukeboxLayout`
-  redirige a `/`); la app de oyentes (`App.tsx`) no tiene ninguna ruta
-  de administración.
+  tiene rol ADMIN en esa jukebox (si no, `AdminJukeboxLayout` redirige a
+  `/`); la app de oyentes (`App.tsx`) no tiene ninguna ruta de
+  administración.
 - Jukebox física real: solo el dispositivo del admin (conectado a las
   bocinas) reproduce audio de verdad (`useAudioSync`, `withAudio` en
   `PlayerReadout`); los oyentes normales solo ven el estado sincronizado,
