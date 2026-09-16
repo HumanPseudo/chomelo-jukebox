@@ -39,4 +39,10 @@ async def _reset_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest_asyncio.fixture
+async def db_session():
+    async with _TestSession() as session:
+        yield session
+
+
 app.dependency_overrides[get_db] = _get_test_db

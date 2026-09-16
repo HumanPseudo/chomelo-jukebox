@@ -8,7 +8,7 @@ from app.domain.jukebox import JukeboxMember, Role, role_rank
 from app.domain.queue import Player, QueueItem, QueueStatus
 from app.domain.vote import Vote
 from app.providers.music import MusicProvider
-from app.services import music_service, xp_service
+from app.services import music_service, wallet_service, xp_service
 
 
 async def _get_player(db: AsyncSession, jukebox_id: int, *, create: bool) -> Player | None:
@@ -84,7 +84,16 @@ async def add_to_queue(
         position=len(queued),
     )
     db.add(item)
+    await db.flush()
     await xp_service.grant_xp(db, member.user_id, xp_service.ADD_TRACK)
+    await wallet_service.credit(
+        db,
+        member.user_id,
+        wallet_service.ADD_TRACK_CREDIT,
+        idempotency_key=f"add_track:{member.user_id}:{item.id}",
+        kind="add_track",
+        description="Añadiste una canción a la cola",
+    )
     await db.commit()
     await db.refresh(item)
     return item
@@ -196,7 +205,16 @@ async def player_play(db: AsyncSession, jukebox_id: int) -> None:
     player.is_playing = True
     player.position_ms = 0
     await xp_service.grant_xp(db, item.added_by, xp_service.TRACK_PLAYED)
+    await wallet_service.credit(
+        db,
+        item.added_by,
+        wallet_service.TRACK_PLAYED_CREDIT,
+        idempotency_key=f"track_played:{item.added_by}:{item.id}",
+        kind="track_played",
+        description="Tu canción se reprodujo",
+    )
     await db.commit()
+    return
 
 
 async def player_pause(db: AsyncSession, jukebox_id: int) -> None:
@@ -234,6 +252,14 @@ async def player_skip(db: AsyncSession, jukebox_id: int) -> None:
         player.is_playing = True
         player.position_ms = 0
         await xp_service.grant_xp(db, item.added_by, xp_service.TRACK_PLAYED)
+        await wallet_service.credit(
+            db,
+            item.added_by,
+            wallet_service.TRACK_PLAYED_CREDIT,
+            idempotency_key=f"track_played:{item.added_by}:{item.id}",
+            kind="track_played",
+            description="Tu canción se reprodujo",
+        )
     else:
         player.current_item_id = None
         player.is_playing = False

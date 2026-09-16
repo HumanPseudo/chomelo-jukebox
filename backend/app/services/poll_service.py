@@ -8,7 +8,7 @@ from app.core.exceptions import AppError
 from app.domain.jukebox import JukeboxMember
 from app.domain.poll import Poll, PollOption, PollStatus, PollVote
 from app.infra import rate_limit
-from app.services import xp_service
+from app.services import wallet_service, xp_service
 
 POLL_VOTE_RATE_LIMIT = 30
 POLL_VOTE_RATE_WINDOW = 60
@@ -89,7 +89,16 @@ async def create_poll(db: AsyncSession, member: JukeboxMember, payload: PollCrea
     )
     poll.options = [PollOption(text=text) for text in options]
     db.add(poll)
+    await db.flush()
     await xp_service.grant_xp(db, member.user_id, xp_service.CREATE_POLL)
+    await wallet_service.credit(
+        db,
+        member.user_id,
+        wallet_service.CREATE_POLL_CREDIT,
+        idempotency_key=f"poll_created:{member.user_id}:{poll.id}",
+        kind="poll_created",
+        description="Creaste una encuesta",
+    )
     await db.commit()
     await db.refresh(poll)
     return _to_out(poll, {})
@@ -162,6 +171,16 @@ async def cast_vote(db: AsyncSession, member: JukeboxMember, poll_id: int, optio
     if existing is not None:
         raise AppError("ya votaste en esta encuesta", code="poll_already_voted", status_code=409)
 
-    db.add(PollVote(poll_id=poll.id, option_id=option_id, user_id=member.user_id))
+    vote = PollVote(poll_id=poll.id, option_id=option_id, user_id=member.user_id)
+    db.add(vote)
+    await db.flush()
     await xp_service.grant_xp(db, member.user_id, xp_service.POLL_VOTE)
+    await wallet_service.credit(
+        db,
+        member.user_id,
+        wallet_service.POLL_VOTE_CREDIT,
+        idempotency_key=f"poll_vote:{member.user_id}:{vote.id}",
+        kind="poll_vote",
+        description="Participaste en una encuesta",
+    )
     await db.commit()

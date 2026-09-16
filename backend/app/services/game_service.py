@@ -9,7 +9,7 @@ from app.domain.game import GameAttempt, GameRound, GameStatus
 from app.domain.jukebox import JukeboxMember
 from app.games import GAMES
 from app.infra import rate_limit
-from app.services import xp_service
+from app.services import wallet_service, xp_service
 
 DEFAULT_DURATION_SECONDS = 60
 ROUND_START_RATE_LIMIT = 10
@@ -232,6 +232,14 @@ async def guess(
     )
     if correct:
         await xp_service.grant_xp(db, member.user_id, points)
+        await wallet_service.credit(
+            db,
+            member.user_id,
+            points,
+            idempotency_key=f"game_win:{member.user_id}:{round_.id}",
+            kind="game_win",
+            description="Ganaste la ronda de Guess the Song",
+        )
 
     await db.commit()
 

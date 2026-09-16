@@ -6,7 +6,7 @@ from app.domain.jukebox import JukeboxMember
 from app.domain.queue import QueueItem, QueueStatus
 from app.domain.vote import Vote
 from app.infra import rate_limit
-from app.services import queue_service, xp_service
+from app.services import queue_service, wallet_service, xp_service
 
 VOTE_RATE_LIMIT = 30
 VOTE_RATE_WINDOW = 60
@@ -46,6 +46,14 @@ async def cast_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> Non
 
     db.add(Vote(jukebox_id=actor.jukebox_id, queue_item_id=item_id, user_id=actor.user_id))
     await xp_service.grant_xp(db, actor.user_id, xp_service.CAST_VOTE)
+    await wallet_service.credit(
+        db,
+        actor.user_id,
+        wallet_service.CAST_VOTE_CREDIT,
+        idempotency_key=f"vote:{actor.user_id}:{item_id}",
+        kind="vote",
+        description="Tu voto ayudó a reordenar la cola",
+    )
     await db.commit()
     await queue_service.reorder_queue_by_score(db, actor.jukebox_id)
 

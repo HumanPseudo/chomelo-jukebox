@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.domain.wallet import Wallet
 
 
 class User(Base, TimestampMixin):
@@ -12,10 +19,16 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-    profile: Mapped["Profile"] = relationship(
+    profile: Mapped[Profile] = relationship(
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    wallet: Mapped[Wallet] = relationship(
+        back_populates="user",
+        uselist=False,
         lazy="selectin",
     )
 
@@ -32,7 +45,7 @@ class Profile(Base, TimestampMixin):
     bio: Mapped[str] = mapped_column(String(500), nullable=False, server_default="")
     xp: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
-    user: Mapped["User"] = relationship(back_populates="profile")
+    user: Mapped[User] = relationship(back_populates="profile")
 
 
 def level_for_xp(xp: int) -> int:

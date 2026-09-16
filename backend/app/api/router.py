@@ -10,6 +10,7 @@ from app.api.routes import (
     profile,
     queue,
     users,
+    wallet,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -22,3 +23,4 @@ api_router.include_router(music.router)
 api_router.include_router(queue.router)
 api_router.include_router(polls.router)
 api_router.include_router(games.router)
+api_router.include_router(wallet.router)

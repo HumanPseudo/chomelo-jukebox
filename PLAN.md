@@ -5,6 +5,30 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 10 — COMPLETADA ✅.** Wallet + ledger append-only: `credit`/`debit` con
+FOR UPDATE + idempotency keys deterministas, recompensas por acciones (añadir,
+reproducir, votos, encuestas, ganar ronda) abonadas vía wallet, endpoints de
+consulta. 122 tests verdes. Migración `0008_wallet` aplicada.
+
+**FASE 9 — COMPLETADA ✅.** Motor de minijuegos (interfaz `Game`, Guess the Song
+primero): rondas con respuesta secreta, un intento por jugador, cierre automático
+por expiración (reloj inyectable), puntos 100-2·elapsed (mín. 10) y XP == puntos.
+Verificado con Postgres real + worker. 111 tests verdes, migración `0007_games`.
+
+**FASE 8 — COMPLETADA ✅.** Perfiles con bio + XP y nivel (xp//100 + 1), XP solo
+del servidor, `played_at` en reproducción, estadísticas e historial de escucha.
+100 tests verdes, migración `0006_profile_xp`.
+
+**FASE 7 — COMPLETADA ✅.** Encuestas con conteos en vivo, cierre automático por
+fecha (reloj inyectable) y un voto por usuario. 90 tests verdes, migración
+`0005_polls`.
+
+**FASE 5 — COMPLETADA ✅.** Player + cola: modelo QueueItem/Player, agregar/quitar/
+reordenar, player autoritativo en servidor, endpoints REST de control, historial.
+
+**FASE 6 — COMPLETADA ✅.** Voto único por usuario (UNIQUE), voto mueve al votar otro
+ítem, reordenamiento por score, rate limit Redis.
+
 **FASE 4 — COMPLETADA ✅.** MusicProvider (interfaz) + YtDlpProvider (HTTP→worker),
 worker con búsqueda/metadata/stream reales con yt-dlp, caché de metadata en Redis con
 TTL, manejo de expiración de stream URLs (6h). Verificado con YouTube real.
@@ -452,9 +476,52 @@ acierto gana" como condición de cierre natural, expiración perezosa con reloj
 inyectable para tests, un intento por jugador con UNIQUE, puntos con decaimiento
 por velocidad (100 - 2·elapsed) y XP == puntos otorgado solo por el servidor.
 
-## FASE 10 — Wallet + Ledger
+## FASE 10 — Wallet + Ledger ✅ (COMPLETADA)
 wallet + wallet_transactions (append-only), FOR UPDATE, idempotency keys,
 endpoints de consulta. Sin pagos aún.
+
+**Entregables (todos completados):**
+- [x] `backend/app/domain/wallet.py` — `Wallet` (1:1 con user, saldo credits) y
+      `WalletTransaction` (ledger **append-only**: nunca se actualiza ni borra),
+      UNIQUE(wallet_id, idempotency_key)
+- [x] `backend/alembic/versions/0008_wallet.py` — tablas `wallets` y
+      `wallet_transactions` (aplicada)
+- [x] `backend/app/services/wallet_service.py` — `credit` (solo el servidor) y
+      `debit` con **SELECT ... FOR UPDATE** + ledger + idempotencia por clave
+      (`INSERT ... ON CONFLICT DO NOTHING` portable SQLite/Postgres); saldo
+      insuficiente = 409; `balance` y `list_transactions`
+- [x] `backend/app/api/schemas/wallet.py` + `routes/wallet.py` —
+      `GET /users/me/wallet` (saldo + últimos 20 movs) y
+      `GET /users/me/wallet/transactions` (paginado)
+- [x] Recompensas conectadas (regla dura: vía wallet, nunca directas):
+      añadir canción +1 (`add_track`), canción reproducida +1 para quien la
+      añadió (`track_played`), voto en cola +1 (`vote`), crear encuesta +2
+      (`poll_created`), votar encuesta +1 (`poll_vote`), ganar ronda = puntos
+      (`game_win`). **Idempotency keys deterministas** por evento
+      (p. ej. `game_win:{user}:{round}`) → reintentos duplicados = no-op
+- [x] `backend/tests/test_wallet.py` — 11 tests (auth 401, wallet a demanda,
+      crédito idempotente, importe inválido 422, débito ok/saldo 409/débito
+      idempotente, recompensa por add/play/vote/poll/game-win == puntos)
+
+**Verificación (ejecutada, Postgres real):**
+```bash
+docker compose exec backend alembic upgrade head   # ✓ 0007_games -> 0008_wallet
+GET /users/me/wallet                               # ✓ credits 0
++ canción + voto + play + encuesta(+2) + voto poll  # ✓ credits 6
+GET /users/me/wallet                               # ✓ ledger con kinds/amounts/desc
+GET /users/me/wallet/transactions?limit=2&offset=3 # ✓ paginación [vote, add_track]
+cd backend && uv run pytest -q                     # ✓ 122 passed (11 nuevos)
+cd backend && uv run ruff check .                  # ✓ All checks passed
+```
+
+**Pendiente (diferido):** comprar créditos → Fase 11 (Micropagos); gastar
+créditos en ventajas aún no definidas; gateway de débito con `PaymentProvider`.
+
+**Conceptos que se aprenden:** ledger append-only con balance como proyección
+(no = alfa de movimientos), lock pessimista FOR UPDATE para el balance, clave de
+idempotencia determinista por evento (el reintento es un no-op seguro), `ON
+CONFLICT DO NOTHING` portátil entre SQLite y Postgres, "el servidor abona, el
+cliente nunca" como principio de economía segura.
 
 ## FASE 11 — Micropagos
 `PaymentProvider` (ABC) + implementación (Stripe o equivalente),
