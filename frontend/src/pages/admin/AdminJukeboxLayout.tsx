@@ -5,6 +5,8 @@ import { JukeboxProvider } from "../../lib/jukeboxContext";
 import { AdminQueueProvider } from "../../lib/adminQueueContext";
 import { useJukeboxSocket } from "../../lib/useJukeboxSocket";
 import { useAudioSync } from "../jukebox/useAudioSync";
+import { useWakeLock } from "../jukebox/useWakeLock";
+import { useMediaSession } from "../jukebox/useMediaSession";
 import type { JukeboxOut, QueueOut, WsEvent } from "../../lib/types";
 import { Button, Empty, SignalDot } from "../../components/ui";
 
@@ -48,6 +50,31 @@ export function AdminJukeboxLayout() {
   const playing = queueData?.items.find((i) => i.id === queueData.player.current_item_id);
   const player = queueData?.player ?? { is_playing: false, position_ms: 0, current_item_id: null };
   const { audioRef, locked, unlock } = useAudioSync(playing, player, true);
+
+  // Wake Lock: que la pantalla no se apague mientras suena (apagarse
+  // puede suspender la pestaña y cortar el audio). Media Session:
+  // controles nativos (pantalla de bloqueo/notificación) y una señal
+  // más para que el navegador no trate esta pestaña como inactiva.
+  useWakeLock(player.is_playing);
+  const onMediaPlay = useCallback(() => {
+    const action = playing ? queue.player.resume : queue.player.play;
+    action(jukeboxId).then(reloadQueue).catch(() => {});
+  }, [jukeboxId, playing, reloadQueue]);
+  const onMediaPause = useCallback(() => {
+    queue.player.pause(jukeboxId).then(reloadQueue).catch(() => {});
+  }, [jukeboxId, reloadQueue]);
+  const onMediaNext = useCallback(() => {
+    queue.player.next(jukeboxId).then(reloadQueue).catch(() => {});
+  }, [jukeboxId, reloadQueue]);
+  const onMediaPrevious = useCallback(() => {
+    queue.player.previous(jukeboxId).then(reloadQueue).catch(() => {});
+  }, [jukeboxId, reloadQueue]);
+  useMediaSession(playing, player, {
+    onPlay: onMediaPlay,
+    onPause: onMediaPause,
+    onNext: onMediaNext,
+    onPrevious: onMediaPrevious,
+  });
 
   if (!jukebox) return <Empty>sintonizando…</Empty>;
 
