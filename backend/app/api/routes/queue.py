@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_membership, get_music_provider, require_role
@@ -13,7 +13,7 @@ from app.api.schemas.queue import (
 from app.db.session import get_db
 from app.domain.jukebox import JukeboxMember, Role
 from app.providers.music import MusicProvider
-from app.services import queue_service, vote_service
+from app.services import audit_service, queue_service, vote_service
 
 router = APIRouter(prefix="/jukeboxes", tags=["jukebox", "queue"])
 
@@ -79,10 +79,21 @@ async def add_to_queue(
 async def remove_from_queue(
     jukebox_id: int,
     item_id: int,
+    request: Request,
     member: JukeboxMember = Depends(get_membership),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await queue_service.remove_item(db, member, item_id)
+    await audit_service.log_action(
+        db,
+        action="queue.remove",
+        user_id=member.user_id,
+        resource_type="queue_item",
+        resource_id=item_id,
+        detail={"jukebox_id": jukebox_id},
+        request=request,
+    )
+    await db.commit()
 
 
 @router.patch("/{jukebox_id}/queue/{item_id}/move", response_model=QueueItemOut)

@@ -58,9 +58,11 @@ async def ws_jukebox(
 
     if websocket.application_state != WebSocketState.CONNECTED:
         await websocket.accept()
+    logger.info("WS accepted for jukebox", extra={"jukebox_id": jukebox_id})
 
     await ws_manager.connect(jukebox_id, websocket)
     await websocket.send_json({"event": "connected", "jukebox_id": jukebox_id, "data": {}})
+    logger.info("WS connected sent", extra={"jukebox_id": jukebox_id})
     try:
         while True:
             message = await websocket.receive_text()

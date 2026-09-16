@@ -41,6 +41,16 @@ async def authenticate(db: AsyncSession, payload: LoginRequest, client_ip: str |
             code="rate_limited",
             status_code=429,
         )
+    if client_ip and await is_rate_limited(
+        f"login_ip:{client_ip}",
+        limit=settings.login_rate_limit_per_ip,
+        window=settings.login_rate_limit_window,
+    ):
+        raise AppError(
+            "demasiados intentos, espera un momento",
+            code="rate_limited",
+            status_code=429,
+        )
 
     user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    admin,
     auth,
     games,
     health,
@@ -28,3 +29,4 @@ api_router.include_router(games.router)
 api_router.include_router(wallet.router)
 api_router.include_router(payments.router)
 api_router.include_router(ws.router)
+api_router.include_router(admin.router)

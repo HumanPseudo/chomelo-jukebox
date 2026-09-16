@@ -1,13 +1,13 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_membership, require_role
 from app.api.schemas.poll import PollCreate, PollOut, PollVoteRequest
 from app.db.session import get_db
 from app.domain.jukebox import JukeboxMember, Role
-from app.services import poll_service
+from app.services import audit_service, poll_service
 
 router = APIRouter(prefix="/jukeboxes", tags=["jukebox", "poll"])
 
@@ -57,17 +57,40 @@ async def cast_vote(
 async def close_poll(
     jukebox_id: int,
     poll_id: int,
+    request: Request,
     member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
     db: AsyncSession = Depends(get_db),
 ) -> PollOut:
-    return await poll_service.close_poll(db, member, poll_id)
+    result = await poll_service.close_poll(db, member, poll_id)
+    await audit_service.log_action(
+        db,
+        action="poll.close",
+        user_id=member.user_id,
+        resource_type="poll",
+        resource_id=poll_id,
+        detail={"jukebox_id": jukebox_id},
+        request=request,
+    )
+    await db.commit()
+    return result
 
 
 @router.delete("/{jukebox_id}/polls/{poll_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_poll(
     jukebox_id: int,
     poll_id: int,
+    request: Request,
     member: JukeboxMember = Depends(require_role(Role.MODERATOR)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await poll_service.delete_poll(db, member, poll_id)
+    await audit_service.log_action(
+        db,
+        action="poll.delete",
+        user_id=member.user_id,
+        resource_type="poll",
+        resource_id=poll_id,
+        detail={"jukebox_id": jukebox_id},
+        request=request,
+    )
+    await db.commit()

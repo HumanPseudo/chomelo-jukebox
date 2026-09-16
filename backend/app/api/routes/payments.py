@@ -6,7 +6,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.domain.user import User
 from app.providers.payments import PaymentProvider, get_payment_provider
-from app.services import payment_service
+from app.services import audit_service, payment_service
 
 router = APIRouter(tags=["payments"])
 
@@ -20,17 +20,37 @@ async def payments_webhook(
     """Endpoint público: el proveedor notifica el resultado de un pago."""
     payload = await request.body()
     signature = request.headers.get("stripe-signature", "")
-    return await payment_service.consume_webhook(db, provider, payload, signature)
+    result = await payment_service.consume_webhook(db, provider, payload, signature)
+    await audit_service.log_action(
+        db,
+        action="payment.webhook",
+        detail={"duplicate": bool(result.get("duplicate"))},
+        request=request,
+    )
+    await db.commit()
+    return result
 
 
 @router.post("/users/me/payments/checkout", response_model=CheckoutOut, status_code=201)
 async def create_checkout(
     payload: CheckoutRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     provider: PaymentProvider = Depends(get_payment_provider),
     db: AsyncSession = Depends(get_db),
 ) -> CheckoutOut:
-    return await payment_service.create_checkout(db, current_user, provider, payload)
+    checkout = await payment_service.create_checkout(db, current_user, provider, payload)
+    await audit_service.log_action(
+        db,
+        action="payment.checkout",
+        user_id=current_user.id,
+        resource_type="payment",
+        resource_id=checkout.payment,
+        detail={"credits": payload.credits, "currency": payload.currency},
+        request=request,
+    )
+    await db.commit()
+    return checkout
 
 
 @router.get("/users/me/payments", response_model=list[PaymentOut])

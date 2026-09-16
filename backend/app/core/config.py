@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # WebSockets: pub/sub Redis para escalar entre instancias (fail-open).
     ws_pubsub_enabled: bool = True
 
+    # Seguridad avanzada (Fase 13).
+    rate_limit_global_limit: int = 300
+    rate_limit_global_window: int = 60
+    login_rate_limit_per_ip: int = 20
+    login_rate_limit_window: int = 60
+
 
 def get_settings() -> Settings:
     return Settings()

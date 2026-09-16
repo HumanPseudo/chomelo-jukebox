@@ -34,11 +34,20 @@ def setup_logging() -> None:
     logging.getLogger("uvicorn.access").disabled = True
 
 
+_REQUEST_ID_PATTERN = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-.$"
+
+
+def _clean_request_id(raw: str) -> str:
+    # Evitar log injection / spoofing con cabeceras controladas por el cliente.
+    cleaned = "".join(c for c in raw if c in _REQUEST_ID_PATTERN)
+    return cleaned[:64] or uuid.uuid4().hex
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Asigna un request id, lo propaga por logging y lo devuelve en headers."""
 
     async def dispatch(self, request: Request, call_next) -> Any:
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request_id = _clean_request_id(request.headers.get("X-Request-ID", ""))
         request.state.request_id = request_id
         start = time.perf_counter()
         response = await call_next(request)
