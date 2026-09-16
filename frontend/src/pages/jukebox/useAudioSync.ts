@@ -18,6 +18,16 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
   const [locked, setLocked] = useState(false);
   const loadedTrackId = useRef<string | null>(null);
 
+  // Resolver el stream real tarda varios segundos (yt-dlp + red); si el
+  // usuario pausa mientras tanto, el callback async no debe usar el
+  // `player` capturado al iniciar la resolución (quedaría obsoleto) sino
+  // el estado más reciente — de ahí esta ref en vez de leer `player`
+  // directamente dentro del `.then()`.
+  const playerRef = useRef(player);
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
+
   function attemptPlay() {
     const audio = audioRef.current;
     if (!audio) return;
@@ -67,8 +77,11 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
         // de canción antes de que resolviera el stream anterior).
         if (!audio || loadedTrackId.current !== trackId) return;
         audio.src = resolved.stream_url;
-        audio.currentTime = player.position_ms / 1000;
-        if (player.is_playing) attemptPlay();
+        // Usar el estado más reciente (playerRef), no el `player` de
+        // cuando arrancó esta resolución: pudo haberse pausado mientras
+        // tanto.
+        audio.currentTime = playerRef.current.position_ms / 1000;
+        if (playerRef.current.is_playing) attemptPlay();
       })
       .catch(() => {
         // stream no disponible (worker caído, video retirado, etc.):

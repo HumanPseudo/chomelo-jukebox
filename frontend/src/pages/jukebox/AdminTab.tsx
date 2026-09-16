@@ -105,6 +105,14 @@ export function AdminTab() {
               </Button>
               <Button
                 size="sm"
+                variant="ghost"
+                disabled={busy || idx === pending.length - 1}
+                onClick={() => act(() => queue.move(jukebox.id, item.id, idx + 1))}
+              >
+                bajar
+              </Button>
+              <Button
+                size="sm"
                 variant="danger"
                 disabled={busy}
                 onClick={() => act(() => queue.remove(jukebox.id, item.id))}
