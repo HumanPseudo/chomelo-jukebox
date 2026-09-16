@@ -5,6 +5,16 @@ Estado del proyecto y plan de trabajo. Actualizar el checkbox al completar cada 
 
 ## Estado actual
 
+**FASE 13 — COMPLETADA ✅.** Seguridad avanzada: cabeceras de seguridad
+(`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+`Permissions-Policy`, `Cache-Control: no-store`, HSTS+CSP solo en
+producción), CORS con origen explícito (nunca `*` + credenciales), rate
+limit global por IP (Redis, fail-open) además del de login existente,
+audit log append-only de acciones sensibles (`audit_logs` + `is_superuser`
+en `users`, endpoint `GET /admin/audit`), handler genérico de excepciones
+que nunca filtra internals, saneo de `X-Request-ID`. Verificado en Docker
+real con Postgres. 147 tests verdes.
+
 **FASE 12 — COMPLETADA ✅.** WebSockets: canal por jukebox con auth por token
 (query JWT), `WSManager` con fan-out local + Redis Pub/Sub (`instance_id` para
 evitar duplicados), eventos `queue/ player/poll/game.updated` emitidos desde
@@ -634,9 +644,80 @@ sala, Redis Pub/Sub como bus horizontal entre instancias detrás del balanceador
 guarda `instance_id` para no duplicar el envío local, evento mínimo (aviso, no
 payload completo) = YAGNI.
 
-## FASE 13 — Seguridad avanzada
+## FASE 13 — Seguridad avanzada ✅ (COMPLETADA)
+
 Hardening: headers, CORS estricto, rate limits globales, audit log de acciones
 sensibles, revisión de superficie de ataque.
+
+**Entregables (todos completados):**
+- [x] `backend/app/core/security_headers.py` — middleware que añade
+      `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+      `Permissions-Policy`, `Cache-Control: no-store` a toda respuesta HTTP;
+      `Strict-Transport-Security` y `Content-Security-Policy` solo si
+      `environment == "production"` (no rompen `/docs` en desarrollo);
+      suprime la cabecera `Server`
+- [x] `backend/app/core/cors.py` — `CORSMiddleware` con `cors_origins`
+      explícitos por config; `allow_credentials=False` si se usa `*`
+      (nunca origen comodín + credenciales)
+- [x] `backend/app/core/rate_limit_middleware.py` — `GlobalRateLimitMiddleware`
+      (Redis, fail-open) por IP, excluye `/health`, `/docs`, `/redoc`,
+      `/openapi.json`, `/payments/webhook` y `OPTIONS`
+- [x] `backend/app/services/auth_service.py` — segundo rate limit de login
+      por IP (`login_ip:{ip}`) además del existente por email
+- [x] `backend/app/domain/audit.py` + `backend/app/services/audit_service.py`
+      — `AuditLog` (append-only: quién, qué, cuándo, desde dónde), saneo de
+      IP/user-agent contra log injection, `log_action()` usado tras commit
+      en acciones sensibles (auth register/login/refresh, crear/borrar
+      jukebox, cambio de rol, remover miembro, checkout/webhook de pagos,
+      cerrar/borrar encuesta, quitar ítem de cola)
+- [x] `backend/app/api/routes/admin.py` — `GET /admin/audit` protegido por
+      `is_superuser` (403 `admin_required` si no lo es)
+- [x] `backend/app/domain/user.py` — columna `is_superuser` (default false)
+- [x] `backend/alembic/versions/0010_audit_logs_superuser.py` — tabla
+      `audit_logs` + columna `users.is_superuser` (aplicada)
+- [x] `backend/app/core/exceptions.py` — handler genérico de `Exception` que
+      loguea el traceback pero responde siempre `{"detail","code":"internal_error"}`
+      sin filtrar internos (ni con `debug=True`)
+- [x] `backend/app/core/logging.py` — saneo de `X-Request-ID` entrante
+      (whitelist de caracteres + longitud máxima) contra spoofing/log injection
+- [x] `backend/app/main.py` — `docs_url`/`redoc_url`/`openapi_url`
+      deshabilitados en producción; orden de middlewares explícito
+- [x] `docker-compose.yml` — `uvicorn --no-server-header`
+- [x] `backend/tests/test_security.py` — 11 tests (headers presentes,
+      HSTS/CSP solo en producción, CORS origen permitido/rechazado, rate
+      limit global bloquea y excluye health/OPTIONS, brute-force de login
+      por IP, 500 genérico oculta el error real, saneo de request id,
+      audit log con permisos de superusuario, resource_id correcto en
+      audit de checkout, docs habilitado en dev)
+
+**Verificación (ejecutada, Postgres real + Redis en Docker):**
+```bash
+docker compose up -d --build                        # ✓ todos healthy
+docker compose exec backend alembic upgrade head     # ✓ 0009_payments -> 0010_audit
+curl -sD - localhost:8000/health                     # ✓ headers de seguridad, sin "Server"
+curl -sD - -H "Origin: http://localhost:3000" .../jukeboxes  # ✓ access-control-allow-origin ecoado
+curl -sD - -H "Origin: http://evil.example" .../jukeboxes    # ✓ sin access-control-allow-origin
+POST /auth/register + /auth/login (fase13@chomelo.app)       # ✓ 201/200
+UPDATE users SET is_superuser=true (psql directo)             # ✓
+GET /admin/audit (Bearer token del mismo user)                 # ✓ 200, incluye auth.register/auth.login
+cd backend && uv run pytest -q                        # ✓ 147 passed (11 nuevos)
+cd backend && uv run ruff check . && ruff format --check .    # ✓ limpio
+```
+
+**Pendiente (diferido):** revocación de tokens (blacklist en Redis);
+métricas de seguridad (intentos bloqueados, 4xx/5xx) → Fase 15
+(Observabilidad); tests de concurrencia (webhooks/votos duplicados) →
+Fase 14; panel de administración más allá de la consulta del audit log.
+
+**Conceptos que se aprenden:** defensa en profundidad con middlewares en
+capas (rate limit → headers → CORS, del más interno al más externo),
+CSP/HSTS solo tienen sentido detrás de TLS real (por eso solo en
+producción), un audit log append-only es la fuente de verdad para
+"quién hizo qué" y debe sanear entradas controladas por el cliente
+(IP, user-agent, request-id) antes de persistirlas, un handler de
+excepciones "catch-all" es la última red para no filtrar tracebacks,
+y `is_superuser` como bandera simple es suficiente antes de necesitar
+un sistema de roles global (YAGNI).
 
 ## FASE 14 — Tests de concurrencia
 Votos simultáneos, transacciones de wallet simultáneas, webhooks duplicados,

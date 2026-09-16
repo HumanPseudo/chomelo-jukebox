@@ -142,6 +142,44 @@ async def test_audit_log_written_on_sensitive_actions(db_session):
         assert "auth.login" in actions
 
 
+async def test_audit_log_checkout_resource_id_is_payment_id(db_session):
+    from app.main import app
+    from app.providers.payments import get_payment_provider
+    from tests.test_payments import FakePaymentProvider
+
+    fake = FakePaymentProvider()
+    app.dependency_overrides[get_payment_provider] = lambda: fake
+    try:
+        async with _client() as c:
+            token = await register_user(c, "audit_pay@test.com")
+            su = User(
+                email="su2@test.com", password_hash=hash_password(PASSWORD), is_superuser=True
+            )
+            db_session.add(su)
+            await db_session.commit()
+            su_token = (
+                await c.post(
+                    "/api/v1/auth/login", json={"email": "su2@test.com", "password": PASSWORD}
+                )
+            ).json()["access_token"]
+
+            checkout = (
+                await c.post(
+                    "/api/v1/users/me/payments/checkout",
+                    headers=auth(token),
+                    json={"credits": 100},
+                )
+            ).json()
+
+            r = await c.get("/api/v1/admin/audit?action=payment.checkout", headers=auth(su_token))
+            assert r.status_code == 200
+            entries = r.json()
+            assert len(entries) == 1
+            assert entries[0]["resource_id"] == str(checkout["payment"]["id"])
+    finally:
+        app.dependency_overrides.pop(get_payment_provider, None)
+
+
 async def test_openapi_enabled_in_dev():
     from app.main import app
 

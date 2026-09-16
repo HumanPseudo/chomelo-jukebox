@@ -45,7 +45,7 @@ async def create_checkout(
         action="payment.checkout",
         user_id=current_user.id,
         resource_type="payment",
-        resource_id=checkout.payment,
+        resource_id=checkout.payment.id,
         detail={"credits": payload.credits, "currency": payload.currency},
         request=request,
     )
