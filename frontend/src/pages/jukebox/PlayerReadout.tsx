@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { PlayerStateOut, QueueItemOut } from "../../lib/types";
-import { SignalDot, Tag } from "../../components/ui";
+import { Button, SignalDot, Tag } from "../../components/ui";
 import { formatDuration } from "./QueueTab";
+import { useAudioSync } from "./useAudioSync";
 
 export function PlayerReadout({
   item,
@@ -13,6 +14,7 @@ export function PlayerReadout({
   controls?: ReactNode;
 }) {
   const [positionMs, setPositionMs] = useState(player.position_ms);
+  const { audioRef, locked, unlock } = useAudioSync(item, player);
 
   useEffect(() => {
     setPositionMs(player.position_ms);
@@ -23,9 +25,12 @@ export function PlayerReadout({
     return () => clearInterval(timer);
   }, [player.position_ms, player.is_playing]);
 
+  const audioTag = <audio ref={audioRef} preload="auto" />;
+
   if (!item) {
     return (
       <div className="player">
+        {audioTag}
         <div className="player__art" />
         <div className="player__meta">
           <Tag>sin transmisión</Tag>
@@ -33,6 +38,7 @@ export function PlayerReadout({
             agrega una canción a la cola para empezar
           </p>
         </div>
+        {controls}
       </div>
     );
   }
@@ -42,6 +48,7 @@ export function PlayerReadout({
 
   return (
     <div className="player">
+      {audioTag}
       {item.thumbnail_url ? (
         <img className="player__art" src={item.thumbnail_url} alt="" />
       ) : (
@@ -62,6 +69,11 @@ export function PlayerReadout({
           <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
         </div>
       </div>
+      {player.is_playing && locked && (
+        <Button size="sm" onClick={unlock}>
+          🔇 activar sonido
+        </Button>
+      )}
       {controls}
       <SignalDot state={player.is_playing ? "rec" : "idle"} />
     </div>

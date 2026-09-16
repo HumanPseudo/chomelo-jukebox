@@ -7,6 +7,7 @@ import type {
   PollOut,
   ProfileOut,
   QueueOut,
+  ResolvedTrack,
   RoundOut,
   TokenResponse,
   TrackInfo,
@@ -47,6 +48,8 @@ export const jukeboxes = {
 
 export const music = {
   search: (q: string) => api.get<TrackInfo[]>("/music/search", { q }),
+  resolveStream: (trackId: string) =>
+    api.get<ResolvedTrack>(`/music/tracks/${trackId}/stream`),
 };
 
 export const queue = {

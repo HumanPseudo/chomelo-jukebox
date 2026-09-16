@@ -78,6 +78,11 @@ export interface TrackInfo {
   thumbnail_url: string | null;
 }
 
+export interface ResolvedTrack extends TrackInfo {
+  stream_url: string;
+  expires_at: string;
+}
+
 export interface QueueItemOut {
   id: number;
   track_id: string;
