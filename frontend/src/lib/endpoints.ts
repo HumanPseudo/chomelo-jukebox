@@ -1,11 +1,14 @@
 import { api, tokens } from "./api";
 import type {
   AttemptOut,
+  CheckoutOut,
   JukeboxOut,
   ListenHistoryItem,
   MemberOut,
+  PaymentOut,
   PollOut,
   ProfileOut,
+  QueueItemOut,
   QueueOut,
   ResolvedTrack,
   RoundOut,
@@ -64,6 +67,8 @@ export const queue = {
     api.post(`/jukeboxes/${jukeboxId}/queue/${itemId}/vote`),
   unvote: (jukeboxId: number, itemId: number) =>
     api.delete(`/jukeboxes/${jukeboxId}/queue/${itemId}/vote`),
+  boost: (jukeboxId: number, itemId: number, credits: number) =>
+    api.post<QueueItemOut>(`/jukeboxes/${jukeboxId}/queue/${itemId}/boost`, { credits }),
   history: (jukeboxId: number) => api.get(`/jukeboxes/${jukeboxId}/history`),
   player: {
     play: (jukeboxId: number) => api.post(`/jukeboxes/${jukeboxId}/player/play`),
@@ -86,6 +91,12 @@ export const polls = {
     api.post<PollOut>(`/jukeboxes/${jukeboxId}/polls/${pollId}/close`),
   remove: (jukeboxId: number, pollId: number) =>
     api.delete(`/jukeboxes/${jukeboxId}/polls/${pollId}`),
+};
+
+export const payments = {
+  checkout: (credits: number, currency = "eur") =>
+    api.post<CheckoutOut>("/users/me/payments/checkout", { credits, currency }),
+  list: () => api.get<PaymentOut[]>("/users/me/payments"),
 };
 
 export const games = {

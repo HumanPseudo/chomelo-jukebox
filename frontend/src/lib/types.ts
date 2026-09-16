@@ -96,6 +96,7 @@ export interface QueueItemOut {
   created_at: string;
   score: number;
   voted_by_me: boolean;
+  boost: number;
 }
 
 export interface PlayerStateOut {
@@ -171,6 +172,21 @@ export interface WalletTransactionOut {
 export interface WalletOut {
   credits: number;
   transactions: WalletTransactionOut[];
+}
+
+export interface PaymentOut {
+  id: number;
+  provider: string;
+  credits: number;
+  amount_cents: number;
+  currency: string;
+  status: "PENDING" | "PROCESSED" | "CREDITS_GRANTED" | "FAILED";
+  created_at: string;
+}
+
+export interface CheckoutOut {
+  payment: PaymentOut;
+  checkout_url: string;
 }
 
 export interface WsEvent {

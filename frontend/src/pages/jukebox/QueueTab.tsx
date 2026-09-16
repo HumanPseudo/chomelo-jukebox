@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { music, queue } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
+import { ApiError } from "../../lib/api";
 import type { QueueOut, TrackInfo } from "../../lib/types";
 import { Button, Empty, Input, Panel } from "../../components/ui";
 import { PlayerReadout } from "./PlayerReadout";
+
+const BOOST_COST = 10;
 
 export function QueueTab() {
   const { jukebox, lastEvent } = useJukebox();
@@ -11,6 +14,7 @@ export function QueueTab() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<TrackInfo[]>([]);
   const [searching, setSearching] = useState(false);
+  const [boostError, setBoostError] = useState<{ itemId: number; message: string } | null>(null);
 
   const reload = useCallback(async () => {
     setData(await queue.get(jukebox.id));
@@ -46,6 +50,22 @@ export function QueueTab() {
     if (voted) await queue.unvote(jukebox.id, itemId);
     else await queue.vote(jukebox.id, itemId);
     reload();
+  }
+
+  async function boost(itemId: number) {
+    setBoostError(null);
+    try {
+      await queue.boost(jukebox.id, itemId, BOOST_COST);
+      reload();
+    } catch (err) {
+      setBoostError({
+        itemId,
+        message:
+          err instanceof ApiError && err.code === "insufficient_balance"
+            ? "no te alcanzan los créditos"
+            : "no se pudo impulsar",
+      });
+    }
   }
 
   if (!data) return <Empty>cargando cola…</Empty>;
@@ -100,11 +120,26 @@ export function QueueTab() {
             )}
             <div className="queue-item__meta">
               <div className="queue-item__title">{item.title}</div>
-              <div className="queue-item__artist">{item.artist || "desconocido"}</div>
+              <div className="queue-item__artist">
+                {item.artist || "desconocido"}
+                {item.boost > 0 && <span className="boost-badge"> ⚡ +{item.boost}</span>}
+              </div>
+              {boostError?.itemId === item.id && (
+                <div className="error-text" style={{ fontSize: 11 }}>
+                  {boostError.message}
+                </div>
+              )}
             </div>
-            <span className="mono" style={{ color: "var(--dim)", fontSize: 12 }}>
+            <span className="queue-item__dur mono" style={{ color: "var(--dim)", fontSize: 12 }}>
               {item.duration_seconds ? formatDuration(item.duration_seconds) : ""}
             </span>
+            <button
+              className="boost-btn"
+              onClick={() => boost(item.id)}
+              title="gastar créditos para priorizar"
+            >
+              ⚡ {BOOST_COST}
+            </button>
             <button
               className={`vote-btn ${item.voted_by_me ? "is-voted" : ""}`}
               onClick={() => toggleVote(item.id, item.voted_by_me)}

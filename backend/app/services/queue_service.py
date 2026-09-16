@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,13 +60,44 @@ async def _my_voted_item_ids(db: AsyncSession, jukebox_id: int, user_id: int) ->
 
 
 async def reorder_queue_by_score(db: AsyncSession, jukebox_id: int) -> None:
-    """Reordena los ítems QUEUED por (score DESC, posición ASC) y renumeriza."""
+    """Reordena los ítems QUEUED por (votos + impulso pagado) DESC, posición ASC."""
     queued = await _queued(db, jukebox_id)
     scores = await _item_scores(db, jukebox_id)
-    queued.sort(key=lambda i: (-scores.get(i.id, 0), i.position if i.position is not None else 0))
+    queued.sort(
+        key=lambda i: (
+            -(scores.get(i.id, 0) + i.boost),
+            i.position if i.position is not None else 0,
+        )
+    )
     for index, item in enumerate(queued):
         item.position = index
     await db.commit()
+
+
+async def boost_item(
+    db: AsyncSession, actor: JukeboxMember, item_id: int, credits: int
+) -> QueueItem:
+    """Gasta créditos para impulsar la posición de un ítem en la cola."""
+    item = await db.get(QueueItem, item_id)
+    if item is None or item.jukebox_id != actor.jukebox_id:
+        raise AppError("ítem no encontrado", code="queue_item_not_found", status_code=404)
+    if item.status != QueueStatus.QUEUED.value:
+        raise AppError(
+            "solo se pueden impulsar ítems en cola", code="item_not_boostable", status_code=409
+        )
+    await wallet_service.debit(
+        db,
+        actor.user_id,
+        credits,
+        idempotency_key=f"boost:{actor.user_id}:{item_id}:{uuid4().hex}",
+        kind="boost",
+        description=f"Impulsaste «{item.title}»",
+    )
+    item.boost += credits
+    await db.commit()
+    await reorder_queue_by_score(db, actor.jukebox_id)
+    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item.id)
+    return item
 
 
 async def add_to_queue(

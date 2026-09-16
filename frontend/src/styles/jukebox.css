@@ -51,7 +51,7 @@
 
 .queue-item {
   display: grid;
-  grid-template-columns: 32px 56px 1fr auto auto;
+  grid-template-columns: 32px 56px 1fr auto auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -115,6 +115,24 @@
 .vote-btn.is-voted {
   color: var(--signal);
   border-color: var(--signal);
+}
+
+.boost-btn {
+  background: none;
+  border: 1px solid var(--signal-dim);
+  color: var(--signal);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.boost-btn:hover {
+  border-color: var(--signal);
+  background: var(--panel-raised);
+}
+
+.boost-badge {
+  color: var(--signal);
 }
 
 .search-results {
@@ -233,6 +251,9 @@
     grid-template-columns: 1fr;
   }
   .queue-item {
-    grid-template-columns: 24px 40px 1fr auto;
+    grid-template-columns: 24px 40px 1fr auto auto;
+  }
+  .queue-item__dur {
+    display: none;
   }
 }

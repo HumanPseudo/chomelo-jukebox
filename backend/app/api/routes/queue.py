@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_membership, get_music_provider, require_role
 from app.api.schemas.queue import (
+    BoostRequest,
     ItemMove,
     PlayerStateOut,
     QueueAdd,
@@ -34,6 +35,7 @@ def _item_out(item, score: int = 0, voted_by_me: bool = False) -> QueueItemOut:
         created_at=item.created_at,
         score=score,
         voted_by_me=voted_by_me,
+        boost=item.boost,
     )
 
 
@@ -186,3 +188,29 @@ async def remove_vote(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await vote_service.remove_vote(db, member, item_id)
+
+
+# ---------- impulso pagado ----------
+
+
+@router.post("/{jukebox_id}/queue/{item_id}/boost", response_model=QueueItemOut)
+async def boost_item(
+    jukebox_id: int,
+    item_id: int,
+    payload: BoostRequest,
+    request: Request,
+    member: JukeboxMember = Depends(require_role(Role.MEMBER)),
+    db: AsyncSession = Depends(get_db),
+) -> QueueItemOut:
+    item = await queue_service.boost_item(db, member, item_id, payload.credits)
+    await audit_service.log_action(
+        db,
+        action="queue.boost",
+        user_id=member.user_id,
+        resource_type="queue_item",
+        resource_id=item_id,
+        detail={"jukebox_id": jukebox_id, "credits": payload.credits},
+        request=request,
+    )
+    await db.commit()
+    return _item_out(item)

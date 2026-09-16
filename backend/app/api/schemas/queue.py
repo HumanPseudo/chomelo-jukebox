@@ -15,6 +15,10 @@ class SeekRequest(BaseModel):
     position_ms: int = Field(ge=0)
 
 
+class BoostRequest(BaseModel):
+    credits: int = Field(ge=1, le=1000)
+
+
 class QueueItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -30,6 +34,7 @@ class QueueItemOut(BaseModel):
     created_at: datetime
     score: int = 0
     voted_by_me: bool = False
+    boost: int = 0
 
 
 class PlayerStateOut(BaseModel):
