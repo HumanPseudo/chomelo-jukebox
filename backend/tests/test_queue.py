@@ -1,8 +1,13 @@
+from datetime import UTC, datetime, timedelta
+
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import update
 
 from app.api.deps import get_music_provider
+from app.domain.queue import Player
 from app.main import app
 from app.providers.music import MusicProvider, MusicProviderError, TrackInfo
+from app.services.queue_service import live_position_ms
 
 _transport = ASGITransport(app=app)
 _BASE = "http://test"
@@ -224,6 +229,9 @@ async def test_seek_clamps_to_duration():
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         await _add(c, owner_token, jukebox_id, "aaa")
         await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/play", headers=_auth(owner_token))
+        # En pausa la posición queda congelada y el seek es exacto; sonando
+        # el servidor la adelanta, así que aquí no se puede comparar exacto.
+        await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/pause", headers=_auth(owner_token))
         await c.post(
             f"/api/v1/jukeboxes/{jukebox_id}/player/seek",
             headers=_auth(owner_token),
@@ -325,3 +333,48 @@ async def test_member_cannot_move():
             json={"position": 0},
         )
     assert r.status_code == 403
+
+
+# ---------- tiempo del reproductor ----------
+
+
+def _player(is_playing: bool, position_ms: int, updated_at: datetime) -> Player:
+    player = Player(jukebox_id=1, is_playing=is_playing, position_ms=position_ms)
+    player.updated_at = updated_at
+    return player
+
+
+def test_live_position_advances_while_playing():
+    anchor = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    player = _player(True, 5_000, anchor)
+    assert live_position_ms(player, now=anchor + timedelta(seconds=10)) == 15_000
+
+
+def test_live_position_frozen_when_paused():
+    anchor = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    player = _player(False, 5_000, anchor)
+    assert live_position_ms(player, now=anchor + timedelta(seconds=10)) == 5_000
+
+
+def test_live_position_handles_naive_anchor_and_clamps_to_duration():
+    player = _player(True, 179_000, datetime(2026, 1, 1, 12, 0, 0))
+    now = datetime(2026, 1, 1, 12, 0, 10, tzinfo=UTC)
+    assert live_position_ms(player, duration_seconds=180, now=now) == 180_000
+
+
+async def test_queue_reports_advanced_position_while_playing(db_session):
+    owner_token, _member, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        await _add(c, owner_token, jukebox_id, "aaa")
+        await c.post(f"/api/v1/jukeboxes/{jukebox_id}/player/play", headers=_auth(owner_token))
+        # El ancla es vieja: el servidor debe adelantarla ~10s al responder.
+        await db_session.execute(
+            update(Player)
+            .where(Player.jukebox_id == jukebox_id)
+            .values(position_ms=5_000, updated_at=datetime.now(UTC) - timedelta(seconds=10))
+        )
+        await db_session.commit()
+        q = (
+            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/queue", headers=_auth(owner_token))
+        ).json()
+    assert 14_500 <= q["player"]["position_ms"] <= 15_500

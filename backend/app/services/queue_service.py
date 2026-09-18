@@ -59,6 +59,33 @@ async def _my_voted_item_ids(db: AsyncSession, jukebox_id: int, user_id: int) ->
     return set(rows.scalars())
 
 
+def live_position_ms(
+    player: Player,
+    *,
+    duration_seconds: int | None = None,
+    now: datetime | None = None,
+) -> int:
+    """Posición real de reproducción en este instante.
+
+    `players.position_ms` es solo el ancla guardada la última vez que algo
+    cambió (play/pausa/seek/next); mientras suena, la canción avanza sola.
+    Si devolviéramos el ancla tal cual, cada cliente la extrapolaría desde
+    su propio reloj y el temporizador de oyentes y admin se descuadraría.
+    Aquí la adelantamos hasta `now` para que el servidor sea la referencia.
+    """
+    position = max(0, player.position_ms)
+    updated_at = player.updated_at
+    if player.is_playing and updated_at is not None:
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=UTC)
+        elapsed_ms = int(((now or datetime.now(UTC)) - updated_at).total_seconds() * 1000)
+        if elapsed_ms > 0:
+            position += elapsed_ms
+    if duration_seconds:
+        position = min(position, duration_seconds * 1000)
+    return position
+
+
 async def reorder_queue_by_score(db: AsyncSession, jukebox_id: int) -> None:
     """Reordena los ítems QUEUED por (votos + impulso pagado) DESC, posición ASC."""
     queued = await _queued(db, jukebox_id)

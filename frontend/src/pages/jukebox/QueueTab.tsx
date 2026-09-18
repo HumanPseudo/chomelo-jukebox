@@ -12,10 +12,12 @@ const BOOST_COST = 10;
 export function QueueTab() {
   const { jukebox, lastEvent } = useJukebox();
   const [data, setData] = useState<QueueOut | null>(null);
+  const [fetchedAt, setFetchedAt] = useState(0);
   const [boostError, setBoostError] = useState<{ itemId: number; message: string } | null>(null);
 
   const reload = useCallback(async () => {
     setData(await queue.get(jukebox.id));
+    setFetchedAt(Date.now());
   }, [jukebox.id]);
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export function QueueTab() {
   return (
     <div>
       <Panel live style={{ marginBottom: "24px" }}>
-        <PlayerReadout item={playing} player={data.player} />
+        <PlayerReadout item={playing} player={data.player} positionAt={fetchedAt} />
       </Panel>
 
       <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} />

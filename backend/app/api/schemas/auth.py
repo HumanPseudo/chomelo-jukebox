@@ -31,5 +31,6 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     is_active: bool
+    is_superuser: bool = False
     created_at: datetime
     display_name: str = ""

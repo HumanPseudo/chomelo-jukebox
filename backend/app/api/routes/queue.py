@@ -48,15 +48,17 @@ async def get_queue(
     items, player, scores, my_votes = await queue_service.get_queue(
         db, jukebox_id=member.jukebox_id, user_id=member.user_id
     )
-    player_state = (
-        PlayerStateOut(
+    if player is None:
+        player_state = _PLAYER_IDLE
+    else:
+        current = next((i for i in items if i.id == player.current_item_id), None)
+        player_state = PlayerStateOut(
             is_playing=player.is_playing,
-            position_ms=player.position_ms,
+            position_ms=queue_service.live_position_ms(
+                player, duration_seconds=current.duration_seconds if current else None
+            ),
             current_item_id=player.current_item_id,
         )
-        if player is not None
-        else _PLAYER_IDLE
-    )
     return QueueOut(
         items=[_item_out(i, scores.get(i.id, 0), i.id in my_votes) for i in items],
         player=player_state,

@@ -1,0 +1,218 @@
+/* Consola de operaciones — cada color mantiene su único trabajo:
+   ámbar = acción, cian = en vivo, rojo = alarma. */
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.stat-tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--signal);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--cut-sm)),
+    calc(100% - var(--cut-sm)) 100%,
+    0 100%
+  );
+}
+.stat-tile__value {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--ink);
+}
+.stat-tile__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+}
+
+.ov-cols {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.ov-next {
+  margin-bottom: var(--space-3);
+}
+.ov-next__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ov-rank {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ov-rank:last-child {
+  border-bottom: none;
+}
+.ov-rank__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-link {
+  display: inline-block;
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--frequency);
+}
+.ov-link:hover {
+  text-decoration: underline;
+}
+
+.activity {
+  display: flex;
+  flex-direction: column;
+}
+.activity__row {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.activity__row:last-child {
+  border-bottom: none;
+}
+.activity__mark {
+  width: 6px;
+  height: 6px;
+  background: var(--signal);
+}
+.activity__mark--track,
+.activity__mark--member {
+  background: var(--frequency);
+}
+.activity__text {
+  color: var(--ink);
+}
+.activity__time {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.seek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.seek input[type="range"] {
+  flex: 1;
+  accent-color: var(--signal);
+}
+.seek__time {
+  font-size: 11px;
+  color: var(--dim);
+  min-width: 96px;
+  text-align: right;
+}
+
+.queue-item--admin .queue-item__actions {
+  display: flex;
+  gap: 2px;
+}
+.queue-item__score {
+  font-size: 12px;
+}
+.icon-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.icon-btn:hover:not(:disabled) {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.icon-btn--danger:hover:not(:disabled) {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+
+.audit {
+  border: 1px solid var(--line);
+}
+.audit__row {
+  display: grid;
+  grid-template-columns: 150px 180px 70px 1fr 1.4fr;
+  gap: var(--space-3);
+  padding: 8px var(--space-3);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  align-items: center;
+}
+.audit__row:last-child {
+  border-bottom: none;
+}
+.audit__row--head {
+  color: var(--dim);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  background: var(--panel-raised);
+}
+.audit__time {
+  color: var(--dim);
+}
+.audit__detail {
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkish {
+  background: none;
+  border: none;
+  color: var(--frequency);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.linkish:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .ov-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ov-cols {
+    grid-template-columns: 1fr;
+  }
+  .audit {
+    overflow-x: auto;
+  }
+  .audit__row {
+    min-width: 640px;
+  }
+}

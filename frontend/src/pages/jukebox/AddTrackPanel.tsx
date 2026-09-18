@@ -5,7 +5,7 @@ import { Button, Input, Panel } from "../../components/ui";
 import { formatDuration } from "./QueueTab";
 
 /** Buscar y añadir una canción a la cola. Lo usan tanto la vista de
- * oyente (QueueTab) como la consola de admin (AdminTab) — el admin
+ * oyente (QueueTab) como la consola de admin (AdminQueueTab) — el admin
  * también necesita poder meter canciones, no solo saltar por la cola
  * que ya está. */
 export function AddTrackPanel({

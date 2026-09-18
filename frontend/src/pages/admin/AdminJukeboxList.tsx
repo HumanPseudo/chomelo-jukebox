@@ -1,16 +1,26 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jukeboxes } from "../../lib/endpoints";
 import type { JukeboxOut } from "../../lib/types";
-import { Empty, Panel, Tag } from "../../components/ui";
+import { Button, Empty, Panel, Tag } from "../../components/ui";
 
 export function AdminJukeboxList() {
   const navigate = useNavigate();
   const [list, setList] = useState<JukeboxOut[] | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      setList(await jukeboxes.list());
+    } catch {
+      setError("no se pudieron cargar tus consolas");
+    }
+  }, []);
 
   useEffect(() => {
-    jukeboxes.list().then(setList);
-  }, []);
+    load();
+  }, [load]);
 
   const consoles = list?.filter((jb) => jb.role === "ADMIN");
 
@@ -19,11 +29,20 @@ export function AdminJukeboxList() {
       <h1>Consolas</h1>
       <p style={{ color: "var(--dim)" }}>frecuencias que administras</p>
 
+      {error && (
+        <p className="error-text" role="alert">
+          {error} ·{" "}
+          <button className="linkish" onClick={load}>
+            reintentar
+          </button>
+        </p>
+      )}
+
       <div style={{ display: "grid", gap: "12px" }}>
-        {consoles === undefined && <Empty>cargando…</Empty>}
+        {!list && !error && <Empty>cargando…</Empty>}
         {consoles?.length === 0 && (
           <Empty>
-            no administras ninguna frecuencia todavía · pídele a alguien con rango de owner que te
+            no administras ninguna frecuencia todavía · pídele a alguien con rango de admin que te
             ascienda desde la app de oyente
           </Empty>
         )}
@@ -39,6 +58,14 @@ export function AdminJukeboxList() {
           </Panel>
         ))}
       </div>
+
+      {consoles && consoles.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <Button variant="ghost" size="sm" onClick={load}>
+            actualizar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

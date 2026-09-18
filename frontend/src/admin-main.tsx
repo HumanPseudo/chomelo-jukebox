@@ -4,6 +4,7 @@ import "./styles/global.css";
 import "./styles/shell.css";
 import "./styles/auth.css";
 import "./styles/jukebox.css";
+import "./styles/admin.css";
 import { AdminApp } from "./AdminApp";
 
 createRoot(document.getElementById("root")!).render(

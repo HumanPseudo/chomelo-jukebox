@@ -9,6 +9,7 @@ export interface UserOut {
   id: number;
   email: string;
   is_active: boolean;
+  is_superuser: boolean;
   created_at: string;
   display_name: string;
 }
@@ -182,4 +183,27 @@ export interface WsEvent {
   event: string;
   jukebox_id?: number;
   data?: Record<string, unknown>;
+}
+
+export interface ActivityOut {
+  id: number;
+  kind: string;
+  user_id: number | null;
+  display_name: string;
+  title: string | null;
+  subtitle: string | null;
+  created_at: string;
+}
+
+export interface AuditOut {
+  id: number;
+  user_id: number | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  detail: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  request_id: string | null;
+  created_at: string;
 }

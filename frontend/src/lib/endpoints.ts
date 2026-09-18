@@ -1,6 +1,8 @@
 import { api, tokens } from "./api";
 import type {
+  ActivityOut,
   AttemptOut,
+  AuditOut,
   CheckoutOut,
   JukeboxOut,
   ListenHistoryItem,
@@ -41,6 +43,8 @@ export const jukeboxes = {
     api.post<JukeboxOut>("/jukeboxes", { name, description }),
   join: (invite_code: string) => api.post<JukeboxOut>("/jukeboxes/join", { invite_code }),
   get: (id: number) => api.get<JukeboxOut>(`/jukeboxes/${id}`),
+  activity: (id: number, limit = 30) =>
+    api.get<ActivityOut[]>(`/jukeboxes/${id}/activity`, { limit }),
   members: (id: number) => api.get<MemberOut[]>(`/jukeboxes/${id}/members`),
   setRole: (id: number, userId: number, role: string) =>
     api.patch<MemberOut>(`/jukeboxes/${id}/members/${userId}`, { role }),
@@ -111,4 +115,11 @@ export const games = {
     api.post<AttemptOut>(`/jukeboxes/${jukeboxId}/games/${gameKey}/rounds/${roundId}/answer`, {
       title,
     }),
+};
+
+/** Consola de plataforma: solo superusuarios. El backend sigue siendo la
+ * autoridad (403 si no lo eres); esto solo alimenta la vista. */
+export const admin = {
+  audit: (params: { limit?: number; offset?: number; action?: string } = {}) =>
+    api.get<AuditOut[]>("/admin/audit", params),
 };

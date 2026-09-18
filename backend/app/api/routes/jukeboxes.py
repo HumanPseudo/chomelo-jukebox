@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_membership, require_role
+from app.api.schemas.activity import ActivityOut
 from app.api.schemas.jukebox import (
     JukeboxCreate,
     JukeboxJoin,
@@ -16,7 +17,7 @@ from app.db.session import get_db
 from app.domain.jukebox import JukeboxMember, Role
 from app.domain.user import User
 from app.infra.rate_limit import is_rate_limited
-from app.services import audit_service, jukebox_service
+from app.services import activity_service, audit_service, jukebox_service
 
 router = APIRouter(prefix="/jukeboxes", tags=["jukeboxes"])
 
@@ -108,6 +109,16 @@ async def regenerate_invite(
 ) -> dict[str, str]:
     code = await jukebox_service.regenerate_invite_code(db, member)
     return {"invite_code": code}
+
+
+@router.get("/{jukebox_id}/activity", response_model=list[ActivityOut])
+async def jukebox_activity(
+    jukebox_id: int,
+    limit: int = Query(default=30, ge=1, le=100),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> list[ActivityOut]:
+    return await activity_service.recent_activity(db, member.jukebox_id, limit=limit)
 
 
 @router.get("/{jukebox_id}/members", response_model=list[MemberOut])

@@ -3,6 +3,10 @@ import type { QueueOut } from "./types";
 
 export interface AdminQueueCtx {
   data: QueueOut | null;
+  /** Epoch ms local en que se recibió `data` del servidor. La posición que
+   * trae `data.player` es válida en ese instante, no ahora; sin esta ancla,
+   * cambiar de pestaña remonta el contador y lo descuadra. */
+  fetchedAt: number;
   reload: () => Promise<void>;
 }
 

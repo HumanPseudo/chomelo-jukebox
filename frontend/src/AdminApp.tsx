@@ -5,7 +5,11 @@ import { AdminShell } from "./components/AdminShell";
 import { Login } from "./pages/Login";
 import { AdminJukeboxList } from "./pages/admin/AdminJukeboxList";
 import { AdminJukeboxLayout } from "./pages/admin/AdminJukeboxLayout";
-import { AdminTab } from "./pages/jukebox/AdminTab";
+import { AdminOverview } from "./pages/admin/AdminOverview";
+import { AdminPlayerTab } from "./pages/admin/AdminPlayerTab";
+import { AdminQueueTab } from "./pages/admin/AdminQueueTab";
+import { AdminActivityTab } from "./pages/admin/AdminActivityTab";
+import { AdminAuditTab } from "./pages/admin/AdminAuditTab";
 import { PollsTab } from "./pages/jukebox/PollsTab";
 import { GamesTab } from "./pages/jukebox/GamesTab";
 import { MembersTab } from "./pages/jukebox/MembersTab";
@@ -37,10 +41,14 @@ export function AdminApp() {
             <Route path="/" element={<AdminJukeboxList />} />
 
             <Route path="/:id" element={<AdminJukeboxLayout />}>
-              <Route index element={<AdminTab />} />
+              <Route index element={<AdminOverview />} />
+              <Route path="player" element={<AdminPlayerTab />} />
+              <Route path="queue" element={<AdminQueueTab />} />
               <Route path="polls" element={<PollsTab />} />
               <Route path="games" element={<GamesTab />} />
               <Route path="members" element={<MembersTab />} />
+              <Route path="activity" element={<AdminActivityTab />} />
+              <Route path="audit" element={<AdminAuditTab />} />
             </Route>
           </Route>
 

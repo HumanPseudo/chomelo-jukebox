@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PlayerStateOut, QueueItemOut } from "../../lib/types";
 import { SignalDot, Tag } from "../../components/ui";
 import { formatDuration } from "./QueueTab";
@@ -8,26 +8,37 @@ import { formatDuration } from "./QueueTab";
  * vive aparte, en AdminJukeboxLayout — que sigue montado sin importar en
  * qué pestaña estés — para que no se corte la música al navegar entre
  * Consola/Encuestas/Miembros. Ver useAudioSync.
+ *
+ * `player.position_ms` es la posición autoritativa del servidor *en el
+ * momento en que se recibió* (`positionAt`, epoch ms local). Extrapolamos
+ * desde esa ancla con el reloj local, no desde el montaje del componente:
+ * así el contador no salta al cambiar de pestaña ni se descuadra respecto
+ * a otros oyentes. Sin `positionAt` cae al tiempo de montaje.
  */
 export function PlayerReadout({
   item,
   player,
   controls,
+  positionAt,
 }: {
   item: QueueItemOut | undefined;
   player: PlayerStateOut;
   controls?: ReactNode;
+  positionAt?: number;
 }) {
-  const [positionMs, setPositionMs] = useState(player.position_ms);
+  const fallbackAnchor = useRef(Date.now());
+  const [, tick] = useState(0);
 
   useEffect(() => {
-    setPositionMs(player.position_ms);
     if (!player.is_playing) return;
-    const start = Date.now();
-    const base = player.position_ms;
-    const timer = setInterval(() => setPositionMs(base + (Date.now() - start)), 500);
+    const timer = setInterval(() => tick((n) => n + 1), 500);
     return () => clearInterval(timer);
-  }, [player.position_ms, player.is_playing]);
+  }, [player.is_playing]);
+
+  const anchor = positionAt && positionAt > 0 ? positionAt : fallbackAnchor.current;
+  const positionMs = player.is_playing
+    ? player.position_ms + Math.max(0, Date.now() - anchor)
+    : player.position_ms;
 
   if (!item) {
     return (
@@ -45,7 +56,8 @@ export function PlayerReadout({
   }
 
   const durationMs = (item.duration_seconds ?? 0) * 1000;
-  const pct = durationMs > 0 ? Math.min(100, (positionMs / durationMs) * 100) : 0;
+  const shownMs = durationMs > 0 ? Math.min(positionMs, durationMs) : positionMs;
+  const pct = durationMs > 0 ? Math.min(100, (shownMs / durationMs) * 100) : 0;
 
   return (
     <div className="player">
@@ -65,7 +77,7 @@ export function PlayerReadout({
           className="mono"
           style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 4 }}
         >
-          <span>{formatDuration(Math.floor(positionMs / 1000))}</span>
+          <span>{formatDuration(Math.floor(shownMs / 1000))}</span>
           <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
         </div>
       </div>
