@@ -7,3 +7,6 @@ COPY pyproject.toml .
 RUN uv pip install --system -e .
 
 COPY . .
+
+RUN chmod +x entrypoint.sh
+ENTRYPOINT ["./entrypoint.sh"]
