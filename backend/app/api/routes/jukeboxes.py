@@ -125,7 +125,7 @@ async def jukebox_activity(
 
 @router.get("/{jukebox_id}/members", response_model=list[MemberOut])
 async def list_jukebox_members(
-    member: JukeboxMember = Depends(get_membership),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> list[MemberOut]:
     return await jukebox_service.list_members(db, member.jukebox_id)

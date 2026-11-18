@@ -54,9 +54,6 @@ export function JukeboxLayout() {
         <NavLink to="games" className={tabClass}>
           Adivina la canción
         </NavLink>
-        <NavLink to="members" className={tabClass}>
-          Miembros
-        </NavLink>
       </nav>
 
       <div className="jb-content">
