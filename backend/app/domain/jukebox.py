@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -39,6 +39,10 @@ class Jukebox(Base, TimestampMixin):
     )
     invite_code: Mapped[str] = mapped_column(String(8), nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    add_track_cooldown_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    add_track_cost_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
 
     members: Mapped[list[JukeboxMember]] = relationship(
         back_populates="jukebox",

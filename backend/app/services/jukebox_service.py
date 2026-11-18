@@ -63,6 +63,8 @@ async def create_jukebox(db: AsyncSession, user: User, payload: JukeboxCreate) -
         owner_id=jukebox.owner_id,
         invite_code=jukebox.invite_code,
         is_active=jukebox.is_active,
+        add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
+        add_track_cost_credits=jukebox.add_track_cost_credits,
         created_at=jukebox.created_at,
         role=Role.ADMIN.value,
         member_count=1,
@@ -93,6 +95,8 @@ async def list_my_jukeboxes(db: AsyncSession, user: User) -> list[JukeboxOut]:
                 owner_id=jukebox.owner_id,
                 invite_code=jukebox.invite_code,
                 is_active=jukebox.is_active,
+                add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
+                add_track_cost_credits=jukebox.add_track_cost_credits,
                 created_at=jukebox.created_at,
                 role=member.role,
                 member_count=await _member_count(db, jukebox.id),
@@ -110,6 +114,8 @@ async def get_jukebox_out(db: AsyncSession, member: JukeboxMember) -> JukeboxOut
         owner_id=jukebox.owner_id,
         invite_code=jukebox.invite_code,
         is_active=jukebox.is_active,
+        add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
+        add_track_cost_credits=jukebox.add_track_cost_credits,
         created_at=jukebox.created_at,
         role=member.role,
         member_count=await _member_count(db, jukebox.id),
@@ -124,6 +130,10 @@ async def update_jukebox(
         jukebox.name = payload.name
     if payload.description is not None:
         jukebox.description = payload.description
+    if payload.add_track_cooldown_seconds is not None:
+        jukebox.add_track_cooldown_seconds = payload.add_track_cooldown_seconds
+    if payload.add_track_cost_credits is not None:
+        jukebox.add_track_cost_credits = payload.add_track_cost_credits
     await db.commit()
     await db.refresh(jukebox)
     return await get_jukebox_out(db, member)
@@ -168,6 +178,8 @@ async def join_by_code(db: AsyncSession, user: User, invite_code: str) -> Jukebo
         owner_id=jukebox.owner_id,
         invite_code=jukebox.invite_code,
         is_active=jukebox.is_active,
+        add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
+        add_track_cost_credits=jukebox.add_track_cost_credits,
         created_at=jukebox.created_at,
         role=Role.MEMBER.value,
         member_count=len(jukebox.members),

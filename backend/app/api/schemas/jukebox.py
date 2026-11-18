@@ -13,6 +13,8 @@ class JukeboxCreate(BaseModel):
 class JukeboxUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=500)
+    add_track_cooldown_seconds: int | None = Field(default=None, ge=0)
+    add_track_cost_credits: int | None = Field(default=None, ge=0)
 
 
 class JukeboxJoin(BaseModel):
@@ -28,6 +30,8 @@ class JukeboxOut(BaseModel):
     owner_id: int
     invite_code: str
     is_active: bool
+    add_track_cooldown_seconds: int = 0
+    add_track_cost_credits: int = 5
     created_at: datetime
     role: str
     member_count: int

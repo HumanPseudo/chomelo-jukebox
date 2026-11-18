@@ -49,6 +49,8 @@ export interface JukeboxOut {
   owner_id: number;
   invite_code: string;
   is_active: boolean;
+  add_track_cooldown_seconds: number;
+  add_track_cost_credits: number;
   created_at: string;
   role: Role;
   member_count: number;

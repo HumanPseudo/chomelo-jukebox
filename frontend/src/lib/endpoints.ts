@@ -47,6 +47,8 @@ export const jukeboxes = {
     api.post<JukeboxOut>("/jukeboxes", { name, description }),
   join: (invite_code: string) => api.post<JukeboxOut>("/jukeboxes/join", { invite_code }),
   get: (id: number) => api.get<JukeboxOut>(`/jukeboxes/${id}`),
+  update: (id: number, patch: { name?: string; description?: string; add_track_cooldown_seconds?: number; add_track_cost_credits?: number }) =>
+    api.patch<JukeboxOut>(`/jukeboxes/${id}`, patch),
   activity: (id: number, limit = 30) =>
     api.get<ActivityOut[]>(`/jukeboxes/${id}/activity`, { limit }),
   members: (id: number) => api.get<MemberOut[]>(`/jukeboxes/${id}/members`),

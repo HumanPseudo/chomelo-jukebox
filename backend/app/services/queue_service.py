@@ -138,7 +138,9 @@ async def add_to_queue(
     # si el usuario ya añadió dentro de la ventana, puede seguir añadiendo
     # gastando créditos (add_track_cost_credits).
     paid = False
-    if settings.add_track_cooldown_seconds > 0:
+    cooldown = member.jukebox.add_track_cooldown_seconds or settings.add_track_cooldown_seconds
+    cost = member.jukebox.add_track_cost_credits or settings.add_track_cost_credits
+    if cooldown > 0:
         last_row = (
             await db.execute(
                 select(QueueItem)
@@ -155,12 +157,12 @@ async def add_to_queue(
             if last_at.tzinfo is None:
                 last_at = last_at.replace(tzinfo=UTC)
             elapsed = (datetime.now(UTC) - last_at).total_seconds()
-            if elapsed < settings.add_track_cooldown_seconds:
+            if elapsed < cooldown:
                 try:
                     await wallet_service.debit(
                         db,
                         member.user_id,
-                        settings.add_track_cost_credits,
+                        cost,
                         idempotency_key=f"add_track_paid:{member.user_id}:{uuid4().hex}",
                         kind="add_track_paid",
                         description="Añadiste una canción usando créditos",
