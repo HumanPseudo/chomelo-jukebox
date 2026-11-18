@@ -13,7 +13,12 @@ export function JukeboxesHome() {
   const [busy, setBusy] = useState(false);
 
   async function reload() {
-    setList(await jukeboxes.list());
+    const data = await jukeboxes.list();
+    if (data.length > 0) {
+      navigate(`/jukeboxes/${data[0].id}`, { replace: true });
+      return;
+    }
+    setList(data);
   }
 
   useEffect(() => {
