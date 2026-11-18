@@ -81,16 +81,15 @@ vez de `border-radius`. Tipografías autohospedadas (`@fontsource`):
 Chakra Petch (UI) + JetBrains Mono (datos/números). Ver
 `frontend/src/styles/tokens.css`.
 
-**Dos apps, un solo proyecto Vite (multi-página):** `index.html` (app de
-oyentes, `App.tsx`) y `admin.html` (consola de administración,
-`AdminApp.tsx`) comparten `src/lib/`, `src/components/` y las páginas de
-`src/pages/jukebox/`. Se sirven en **puertos distintos a propósito**
-(5173 / 5174 → orígenes distintos → `localStorage` separado), para que
-la sesión de un oyente y la de un admin en el mismo navegador nunca se
-pisen. El servicio `admin` de `docker-compose.yml` pasa
-`VITE_ENTRY=admin`, que un plugin en `vite.config.ts` usa para servir
-`admin.html` en la raíz `/` (así la URL de la consola es
-`http://localhost:5174/` sin sufijo).
+**Dos apps, un solo proyecto Vite:** `index.html` se construye dos veces:
+con `App.tsx` para oyentes y, cuando `VITE_ENTRY=admin`, con
+`AdminApp.tsx` para la consola. Ambas comparten `src/lib/`,
+`src/components/` y las páginas de `src/pages/jukebox/`. Se sirven en
+**puertos distintos a propósito** (5173 / 5174 → orígenes distintos →
+`localStorage` separado), para que la sesión de un oyente y la de un
+admin en el mismo navegador nunca se pisen. No existe `admin.html`: el
+servicio `admin` solo cambia el entrypoint del mismo `index.html`, así
+la consola queda en la raíz `http://localhost:5174/` sin sufijo.
 - El WebSocket solo avisa (`queue.updated`, `player.updated`, etc.); los
   datos siempre se re-sincronizan por REST — nunca confiar en el payload
   del evento.
