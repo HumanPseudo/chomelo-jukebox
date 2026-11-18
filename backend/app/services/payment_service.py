@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut
 from app.core.config import settings
 from app.core.exceptions import AppError
+from app.domain.jukebox import Jukebox
 from app.domain.payment import Payment, PaymentEvent, PaymentStatus
 from app.domain.user import User
 from app.infra.db_utils import dialect_insert
@@ -47,7 +48,12 @@ async def create_checkout(
             code="invalid_amount",
             status_code=422,
         )
-    amount_cents = _price_cents(credits)
+    cents_per_credit = settings.cents_per_credit
+    if payload.jukebox_id is not None:
+        jukebox = await db.get(Jukebox, payload.jukebox_id)
+        if jukebox is not None:
+            cents_per_credit = jukebox.credit_price_cents
+    amount_cents = credits * cents_per_credit
     try:
         result = await provider.create_checkout(
             amount_cents=amount_cents,

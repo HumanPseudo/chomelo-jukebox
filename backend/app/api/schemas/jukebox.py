@@ -16,6 +16,7 @@ class JukeboxUpdate(BaseModel):
     add_track_cooldown_seconds: int | None = Field(default=None, ge=0)
     add_track_cost_credits: int | None = Field(default=None, ge=0)
     boost_cost_credits: int | None = Field(default=None, ge=0)
+    credit_price_cents: int | None = Field(default=None, ge=1)
 
 
 class JukeboxJoin(BaseModel):
@@ -34,6 +35,7 @@ class JukeboxOut(BaseModel):
     add_track_cooldown_seconds: int = 0
     add_track_cost_credits: int = 5
     boost_cost_credits: int = 10
+    credit_price_cents: int = 10
     created_at: datetime
     role: str
     member_count: int

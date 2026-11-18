@@ -4,7 +4,7 @@ import { games, jukeboxes, polls } from "../../lib/endpoints";
 import { useJukebox } from "../../lib/jukeboxContext";
 import { useAdminQueue } from "../../lib/adminQueueContext";
 import type { ActivityOut, MemberOut, PollOut, RoundOut } from "../../lib/types";
-import { Button, Empty, Field, Input, Panel, Tag } from "../../components/ui";
+import { Empty, Panel, Tag } from "../../components/ui";
 import { PlayerReadout } from "../jukebox/PlayerReadout";
 import { formatDuration } from "../jukebox/QueueTab";
 import { ActivityFeed } from "./ActivityFeed";
@@ -18,10 +18,6 @@ export function AdminOverview() {
   const [openPolls, setOpenPolls] = useState<PollOut[] | null>(null);
   const [rounds, setRounds] = useState<RoundOut[] | null>(null);
   const [activity, setActivity] = useState<ActivityOut[] | null>(null);
-  const [cooldown, setCooldown] = useState(jukebox.add_track_cooldown_seconds);
-  const [cost, setCost] = useState(jukebox.add_track_cost_credits);
-  const [boostCost, setBoostCost] = useState(jukebox.boost_cost_credits);
-  const [savingCfg, setSavingCfg] = useState(false);
 
   const reload = useCallback(async () => {
     const [m, p, r, a] = await Promise.allSettled([
@@ -43,25 +39,6 @@ export function AdminOverview() {
   useEffect(() => {
     if (lastEvent) reload();
   }, [lastEvent, reload]);
-
-  useEffect(() => {
-    setCooldown(jukebox.add_track_cooldown_seconds);
-    setCost(jukebox.add_track_cost_credits);
-    setBoostCost(jukebox.boost_cost_credits);
-  }, [jukebox.add_track_cooldown_seconds, jukebox.add_track_cost_credits, jukebox.boost_cost_credits]);
-
-  async function saveConfig() {
-    setSavingCfg(true);
-    try {
-      await jukeboxes.update(jukebox.id, {
-        add_track_cooldown_seconds: cooldown,
-        add_track_cost_credits: cost,
-        boost_cost_credits: boostCost,
-      });
-    } finally {
-      setSavingCfg(false);
-    }
-  }
 
   const playing = data?.items.find((i) => i.id === data.player.current_item_id);
   const pending = data?.items.filter((i) => i.status === "QUEUED") ?? [];
@@ -163,34 +140,6 @@ export function AdminOverview() {
           <Link to="members" className="ov-link">
             gestionar miembros →
           </Link>
-        </Panel>
-
-        <Panel>
-          <h3 style={{ marginTop: 0 }}>precios (créditos y COP)</h3>
-          <Field label="cooldown para canción gratis (segundos)">
-            <Input
-              type="number"
-              value={cooldown}
-              onChange={(e) => setCooldown(Number(e.target.value))}
-            />
-          </Field>
-          <Field label="costo en créditos para añadir durante cooldown">
-            <Input
-              type="number"
-              value={cost}
-              onChange={(e) => setCost(Number(e.target.value))}
-            />
-          </Field>
-          <Field label="costo en créditos para impulsar (boost)">
-            <Input
-              type="number"
-              value={boostCost}
-              onChange={(e) => setBoostCost(Number(e.target.value))}
-            />
-          </Field>
-          <Button size="sm" disabled={savingCfg} onClick={saveConfig}>
-            {savingCfg ? "guardando…" : "guardar"}
-          </Button>
         </Panel>
 
         <Panel>

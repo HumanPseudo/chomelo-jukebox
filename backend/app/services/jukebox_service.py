@@ -66,6 +66,7 @@ async def create_jukebox(db: AsyncSession, user: User, payload: JukeboxCreate) -
         add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
         add_track_cost_credits=jukebox.add_track_cost_credits,
         boost_cost_credits=jukebox.boost_cost_credits,
+        credit_price_cents=jukebox.credit_price_cents,
         created_at=jukebox.created_at,
         role=Role.ADMIN.value,
         member_count=1,
@@ -99,6 +100,7 @@ async def list_my_jukeboxes(db: AsyncSession, user: User) -> list[JukeboxOut]:
                 add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
                 add_track_cost_credits=jukebox.add_track_cost_credits,
                 boost_cost_credits=jukebox.boost_cost_credits,
+                credit_price_cents=jukebox.credit_price_cents,
                 created_at=jukebox.created_at,
                 role=member.role,
                 member_count=await _member_count(db, jukebox.id),
@@ -119,6 +121,7 @@ async def get_jukebox_out(db: AsyncSession, member: JukeboxMember) -> JukeboxOut
         add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
         add_track_cost_credits=jukebox.add_track_cost_credits,
         boost_cost_credits=jukebox.boost_cost_credits,
+                credit_price_cents=jukebox.credit_price_cents,
         created_at=jukebox.created_at,
         role=member.role,
         member_count=await _member_count(db, jukebox.id),
@@ -139,6 +142,8 @@ async def update_jukebox(
         jukebox.add_track_cost_credits = payload.add_track_cost_credits
     if payload.boost_cost_credits is not None:
         jukebox.boost_cost_credits = payload.boost_cost_credits
+    if payload.credit_price_cents is not None:
+        jukebox.credit_price_cents = payload.credit_price_cents
     await db.commit()
     await db.refresh(jukebox)
     return await get_jukebox_out(db, member)
@@ -186,6 +191,7 @@ async def join_by_code(db: AsyncSession, user: User, invite_code: str) -> Jukebo
         add_track_cooldown_seconds=jukebox.add_track_cooldown_seconds,
         add_track_cost_credits=jukebox.add_track_cost_credits,
         boost_cost_credits=jukebox.boost_cost_credits,
+        credit_price_cents=jukebox.credit_price_cents,
         created_at=jukebox.created_at,
         role=Role.MEMBER.value,
         member_count=len(jukebox.members),

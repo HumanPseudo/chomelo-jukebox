@@ -184,6 +184,9 @@ export function AdminJukeboxLayout() {
           <NavLink to="activity" className={tabClass}>
             Actividad
           </NavLink>
+          <NavLink to="payments" className={tabClass}>
+            Pagos
+          </NavLink>
           {user?.is_superuser && (
             <NavLink to="audit" className={tabClass}>
               Auditoría

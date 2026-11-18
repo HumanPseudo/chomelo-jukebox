@@ -9,6 +9,7 @@ import { AdminOverview } from "./pages/admin/AdminOverview";
 import { AdminPlayerTab } from "./pages/admin/AdminPlayerTab";
 import { AdminQueueTab } from "./pages/admin/AdminQueueTab";
 import { AdminActivityTab } from "./pages/admin/AdminActivityTab";
+import { AdminPaymentsTab } from "./pages/admin/AdminPaymentsTab";
 import { AdminAuditTab } from "./pages/admin/AdminAuditTab";
 import { PollsTab } from "./pages/jukebox/PollsTab";
 import { GamesTab } from "./pages/jukebox/GamesTab";
@@ -49,6 +50,7 @@ export function AdminApp() {
               <Route path="games" element={<GamesTab />} />
               <Route path="members" element={<MembersTab />} />
               <Route path="activity" element={<AdminActivityTab />} />
+              <Route path="payments" element={<AdminPaymentsTab />} />
               <Route path="audit" element={<AdminAuditTab />} />
             </Route>
           </Route>
