@@ -7,7 +7,8 @@ export interface TokenResponse {
 
 export interface UserOut {
   id: number;
-  email: string;
+  phone_number: string;
+  email?: string | null;
   is_active: boolean;
   is_superuser: boolean;
   created_at: string;

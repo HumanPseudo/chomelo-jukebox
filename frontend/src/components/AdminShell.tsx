@@ -30,7 +30,7 @@ export function AdminShell() {
         </nav>
         <div className="shell__user">
           <SignalDot state="live" />
-          <span className="mono">{user?.display_name || user?.email}</span>
+          <span className="mono">{user?.display_name || user?.phone_number}</span>
           <button className="shell__logout" onClick={logout}>
             salir
           </button>

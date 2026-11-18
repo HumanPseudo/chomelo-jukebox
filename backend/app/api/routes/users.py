@@ -11,7 +11,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut(
         id=current_user.id,
-        email=current_user.email,
+        phone_number=current_user.phone_number,
         is_active=current_user.is_active,
         is_superuser=current_user.is_superuser,
         created_at=current_user.created_at,

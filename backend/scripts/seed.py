@@ -20,20 +20,28 @@ from app.domain.user import User
 from app.services import jukebox_service, wallet_service
 from app.services.auth_service import register_user
 
-ADMIN_EMAIL = "admin@chomelo.dev"
-MEMBER_EMAILS = ["member1@chomelo.dev", "member2@chomelo.dev"]
+ADMIN_PHONE = "+573001234567"
+MEMBER_PHONES = ["+573009876543", "+573009876544"]
 PASSWORD = "chomelo1234"
 JUKEBOX_NAME = "Jukebox de Prueba"
 SEED_CREDITS = 20
 
 
-async def _get_or_create_user(db, email: str, display_name: str) -> User:
-    existing = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+async def _get_or_create_user(db, phone: str, display_name: str, *, is_superuser: bool = False) -> User:
+    existing = (await db.execute(select(User).where(User.phone_number == phone))).scalar_one_or_none()
     if existing is not None:
+        if is_superuser and not existing.is_superuser:
+            existing.is_superuser = True
+            await db.commit()
         return existing
-    return await register_user(
-        db, RegisterRequest(email=email, password=PASSWORD, display_name=display_name)
+    user = await register_user(
+        db, RegisterRequest(phone_number=phone, password=PASSWORD, display_name=display_name)
     )
+    if is_superuser:
+        user.is_superuser = True
+        await db.commit()
+        await db.refresh(user)
+    return user
 
 
 async def _get_or_create_jukebox(db, admin: User) -> Jukebox:
@@ -50,10 +58,10 @@ async def _get_or_create_jukebox(db, admin: User) -> Jukebox:
 
 async def main() -> None:
     async with SessionLocal() as db:
-        admin = await _get_or_create_user(db, ADMIN_EMAIL, "Admin")
+        admin = await _get_or_create_user(db, ADMIN_PHONE, "Admin", is_superuser=True)
         jukebox = await _get_or_create_jukebox(db, admin)
 
-        members = [await _get_or_create_user(db, e, f"Oyente {i}") for i, e in enumerate(MEMBER_EMAILS, start=1)]
+        members = [await _get_or_create_user(db, p, f"Oyente {i}") for i, p in enumerate(MEMBER_PHONES, start=1)]
         for member in members:
             try:
                 await jukebox_service.join_by_code(db, member, jukebox.invite_code)
@@ -72,9 +80,9 @@ async def main() -> None:
 
         await db.commit()
 
-        print(f"Admin:   {ADMIN_EMAIL} / {PASSWORD}")
-        for email in MEMBER_EMAILS:
-            print(f"Miembro: {email} / {PASSWORD}")
+        print(f"Admin:   {ADMIN_PHONE} / {PASSWORD}")
+        for phone in MEMBER_PHONES:
+            print(f"Miembro: {phone} / {PASSWORD}")
         print(f"Jukebox: {jukebox.name} (código: {jukebox.invite_code})")
 
 

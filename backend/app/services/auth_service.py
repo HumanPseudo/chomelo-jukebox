@@ -18,13 +18,13 @@ from app.infra.rate_limit import is_rate_limited
 
 async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     existing = (
-        await db.execute(select(User).where(User.email == payload.email))
+        await db.execute(select(User).where(User.phone_number == payload.phone_number))
     ).scalar_one_or_none()
     if existing is not None:
-        raise AppError("el email ya está registrado", code="email_taken", status_code=409)
+        raise AppError("el teléfono ya está registrado", code="phone_taken", status_code=409)
 
-    user = User(email=payload.email, password_hash=hash_password(payload.password))
-    display_name = payload.display_name or payload.email.split("@")[0]
+    user = User(phone_number=payload.phone_number, password_hash=hash_password(payload.password))
+    display_name = payload.display_name or payload.phone_number
     user.profile = Profile(display_name=display_name)
     db.add(user)
     await db.commit()
@@ -34,7 +34,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
 
 async def authenticate(db: AsyncSession, payload: LoginRequest, client_ip: str | None) -> User:
     if await is_rate_limited(
-        f"login:{payload.email}", limit=settings.jwt_expire_minutes, window=60
+        f"login:{payload.phone_number}", limit=settings.jwt_expire_minutes, window=60
     ):
         raise AppError(
             "demasiados intentos, espera un momento",
@@ -52,7 +52,7 @@ async def authenticate(db: AsyncSession, payload: LoginRequest, client_ip: str |
             status_code=429,
         )
 
-    user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.phone_number == payload.phone_number))).scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise AppError("credenciales inválidas", code="invalid_credentials", status_code=401)
     if not user.is_active:

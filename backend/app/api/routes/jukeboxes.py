@@ -29,6 +29,8 @@ async def create_jukebox(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> JukeboxOut:
+    if not current_user.is_superuser:
+        raise AppError("solo el admin puede crear transmisiones", code="forbidden", status_code=403)
     jb = await jukebox_service.create_jukebox(db, current_user, payload)
     await audit_service.log_action(
         db,

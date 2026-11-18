@@ -17,7 +17,7 @@ async def register(
 ) -> TokenResponse:
     user = await register_user(db, payload)
     await audit_service.log_action(
-        db, action="auth.register", user_id=user.id, detail={"email": user.email}, request=request
+        db, action="auth.register", user_id=user.id, detail={"phone_number": user.phone_number}, request=request
     )
     await db.commit()
     return issue_tokens(user)

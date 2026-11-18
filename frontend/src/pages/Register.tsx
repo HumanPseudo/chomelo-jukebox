@@ -7,7 +7,7 @@ import { Button, Field, Input, Panel } from "../components/ui";
 export function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,7 +18,7 @@ export function Register() {
     setError("");
     setBusy(true);
     try {
-      await register(email, password, displayName || undefined);
+      await register(phone, password, displayName || undefined);
       navigate("/jukeboxes", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "no se pudo conectar con el servidor");
@@ -37,12 +37,12 @@ export function Register() {
         </div>
         <Panel accent>
           <form onSubmit={onSubmit}>
-            <Field label="correo">
+            <Field label="teléfono">
               <Input
-                type="email"
+                type="tel"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 autoFocus
               />
             </Field>

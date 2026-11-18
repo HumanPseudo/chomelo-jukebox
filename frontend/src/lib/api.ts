@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
 const ACCESS_KEY = "chomelo_access";
 const REFRESH_KEY = "chomelo_refresh";
@@ -58,7 +58,7 @@ interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
-  const url = new URL(`${BASE_URL}${path}`);
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) url.searchParams.set(key, String(value));
@@ -112,7 +112,9 @@ export const api = {
 };
 
 export function wsUrl(jukeboxId: number): string {
-  const httpBase = BASE_URL.replace(/\/api\/v1$/, "");
-  const wsBase = httpBase.replace(/^http/, "ws");
+  const httpBase = BASE_URL.startsWith("http")
+    ? BASE_URL
+    : `${window.location.origin}${BASE_URL}`;
+  const wsBase = httpBase.replace(/\/api\/v1$/, "").replace(/^http/, "ws");
   return `${wsBase}/api/v1/ws/jukebox/${jukeboxId}?token=${tokens.access}`;
 }

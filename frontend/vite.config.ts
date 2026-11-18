@@ -34,6 +34,12 @@ function serveAdminAtRoot(): Plugin | null {
 // docker-compose.yml) para que cada una tenga su propio localStorage y
 // las sesiones de oyente/admin no se pisen en el mismo navegador.
 export default defineConfig({
+  server: {
+    allowedHosts: ["jukebox.chomelo.org", "jukebox-admin.chomelo.org", "localhost"],
+    proxy: {
+      "/api": "http://backend:8000",
+    },
+  },
   plugins: [react(), serveAdminAtRoot()],
   build: {
     rollupOptions: {

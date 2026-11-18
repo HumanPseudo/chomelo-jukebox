@@ -21,10 +21,10 @@ import type {
 } from "./types";
 
 export const auth = {
-  register: (email: string, password: string, display_name?: string) =>
-    api.post<TokenResponse>("/auth/register", { email, password, display_name }, { auth: false }),
-  login: (email: string, password: string) =>
-    api.post<TokenResponse>("/auth/login", { email, password }, { auth: false }),
+  register: (phone_number: string, password: string, display_name?: string) =>
+    api.post<TokenResponse>("/auth/register", { phone_number, password, display_name }, { auth: false }),
+  login: (phone_number: string, password: string) =>
+    api.post<TokenResponse>("/auth/login", { phone_number, password }, { auth: false }),
   logout: () => tokens.clear(),
 };
 

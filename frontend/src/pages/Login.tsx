@@ -18,7 +18,7 @@ export function Login({
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,7 @@ export function Login({
     setError("");
     setBusy(true);
     try {
-      await login(email, password);
+      await login(phone, password);
       const from = (location.state as { from?: string })?.from ?? homePath;
       navigate(from, { replace: true });
     } catch (err) {
@@ -48,12 +48,12 @@ export function Login({
         </div>
         <Panel accent>
           <form onSubmit={onSubmit}>
-            <Field label="correo">
+            <Field label="teléfono">
               <Input
-                type="email"
+                type="tel"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 autoFocus
               />
             </Field>
