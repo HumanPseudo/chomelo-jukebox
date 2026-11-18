@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.profile import ListenHistoryItem, ProfileOut, ProfileUpdate
 from app.core.security import get_current_user
+from app.infra.rate_limit import is_rate_limited
 from app.db.session import get_db
 from app.domain.user import User
 from app.services import profile_service
@@ -24,6 +25,10 @@ async def update_my_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProfileOut:
+    if await is_rate_limited(f"profile:{current_user.id}", limit=10, window=60):
+        from app.core.exceptions import AppError
+
+        raise AppError("demasiadas ediciones, espera un momento", code="rate_limited", status_code=429)
     return await profile_service.update_profile(db, current_user, payload)
 
 

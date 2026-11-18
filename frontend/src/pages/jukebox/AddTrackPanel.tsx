@@ -44,7 +44,7 @@ export function AddTrackPanel({
       onAdded();
     } catch (err) {
       if (err instanceof ApiError && err.code === "add_track_cooldown") {
-        setAddError("espera para añadir gratis o usa créditos");
+        setAddError("⏳ espera para añadir gratis o usa créditos");
       } else {
         setAddError("no se pudo añadir");
       }

@@ -65,9 +65,13 @@ export function WalletView() {
 
       <Panel style={{ marginBottom: 24 }}>
         <h3>comprar créditos</h3>
-        <p style={{ color: "var(--dim)", fontSize: 13 }}>
-          te lleva a la pasarela de pago; los créditos se acreditan al confirmarse.
-        </p>
+         <p style={{ color: "var(--dim)", fontSize: 13 }}>
+           te lleva a la pasarela de pago; los créditos se acreditan al confirmarse.
+         </p>
+         <p style={{ color: "var(--dim)", fontSize: 12 }}>
+           precios: 1 crédito = 10 céntimos · impulsar canción = 10 créditos ·
+           añadir en cooldown = 5 créditos
+         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {PRESETS.map((amount) => (
             <Button key={amount} size="sm" disabled={busy} onClick={() => buy(amount)}>
