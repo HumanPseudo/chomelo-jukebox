@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class RegisterRequest(BaseModel):
@@ -10,8 +10,16 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    phone_number: str = Field(pattern=r"^\+?[0-9]{7,15}$", max_length=32)
+    phone_number: str | None = None
+    email: str | None = None
+    identifier: str | None = None
     password: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def _check_identifier(self):
+        if not (self.phone_number or self.email or self.identifier):
+            raise ValueError("se requiere teléfono o correo")
+        return self
 
 
 class RefreshRequest(BaseModel):

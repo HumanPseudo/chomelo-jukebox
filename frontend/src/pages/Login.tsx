@@ -9,16 +9,18 @@ export function Login({
   showRegister = true,
   title = "Sintonizar señal",
   tagline = "acceso a la red de jukebox clandestinas",
+  identifierType = "phone",
 }: {
   homePath?: string;
   showRegister?: boolean;
   title?: string;
   tagline?: string;
+  identifierType?: "phone" | "email";
 }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +30,7 @@ export function Login({
     setError("");
     setBusy(true);
     try {
-      await login(phone, password);
+      await login(identifier, password);
       const from = (location.state as { from?: string })?.from ?? homePath;
       navigate(from, { replace: true });
     } catch (err) {
@@ -48,12 +50,12 @@ export function Login({
         </div>
         <Panel accent>
           <form onSubmit={onSubmit}>
-            <Field label="teléfono">
+            <Field label={identifierType === "email" ? "correo" : "teléfono"}>
               <Input
-                type="tel"
+                type={identifierType === "email" ? "email" : "tel"}
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 autoFocus
               />
             </Field>

@@ -27,6 +27,7 @@ export function AdminApp() {
                 showRegister={false}
                 title="Consola de admin"
                 tagline="control de transmisión · solo para quien administra"
+                identifierType="email"
               />
             }
           />

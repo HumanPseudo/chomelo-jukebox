@@ -6,7 +6,7 @@ import type { UserOut } from "./types";
 interface AuthState {
   user: UserOut | null;
   loading: boolean;
-  login: (phone_number: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   register: (phone_number: string, password: string, displayName?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setLoading(false));
   }, []);
 
-  async function login(phone_number: string, password: string) {
-    const res = await authApi.login(phone_number, password);
+  async function login(identifier: string, password: string) {
+    const res = await authApi.login(identifier, password);
     tokens.set(res.access_token, res.refresh_token);
     await refreshUser();
   }

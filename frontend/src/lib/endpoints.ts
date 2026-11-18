@@ -23,8 +23,12 @@ import type {
 export const auth = {
   register: (phone_number: string, password: string, display_name?: string) =>
     api.post<TokenResponse>("/auth/register", { phone_number, password, display_name }, { auth: false }),
-  login: (phone_number: string, password: string) =>
-    api.post<TokenResponse>("/auth/login", { phone_number, password }, { auth: false }),
+  login: (identifier: string, password: string) =>
+    api.post<TokenResponse>(
+      "/auth/login",
+      identifier.includes("@") ? { email: identifier, password } : { phone_number: identifier, password },
+      { auth: false },
+    ),
   logout: () => tokens.clear(),
 };
 

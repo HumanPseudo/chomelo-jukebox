@@ -59,6 +59,10 @@ async def _get_or_create_jukebox(db, admin: User) -> Jukebox:
 async def main() -> None:
     async with SessionLocal() as db:
         admin = await _get_or_create_user(db, ADMIN_PHONE, "Admin", is_superuser=True)
+        if not admin.email:
+            admin.email = "admin@chomelo.dev"
+            await db.commit()
+            await db.refresh(admin)
         jukebox = await _get_or_create_jukebox(db, admin)
 
         members = [await _get_or_create_user(db, p, f"Oyente {i}") for i, p in enumerate(MEMBER_PHONES, start=1)]
