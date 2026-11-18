@@ -21,8 +21,10 @@
   --font-display: "Chakra Petch", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --cut: 14px;
-  --cut-sm: 8px;
+  --cut: 0px;
+  --cut-sm: 0px;
+  --radius: 12px;
+  --radius-pill: 999px;
 
   --space-1: 4px;
   --space-2: 8px;

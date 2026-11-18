@@ -21,8 +21,8 @@ body {
   margin: 0;
   background: var(--void);
   background-image:
-    radial-gradient(ellipse at top left, rgba(242, 183, 5, 0.05), transparent 45%),
-    radial-gradient(ellipse at bottom right, rgba(77, 214, 232, 0.04), transparent 50%);
+    radial-gradient(ellipse at top, rgba(29, 185, 84, 0.15), transparent 50%),
+    linear-gradient(180deg, #1a1a1a 0%, var(--void) 100%);
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-display);
@@ -96,7 +96,8 @@ textarea {
   position: relative;
   background: var(--panel);
   border-left: 3px solid var(--line);
-  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  clip-path: none;
+  border-radius: var(--radius);
   padding: var(--space-5);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -128,15 +129,9 @@ textarea {
   font-weight: 600;
   font-size: 14px;
   letter-spacing: 0.02em;
-  padding: 10px 20px 10px 16px;
-  clip-path: polygon(
-    var(--cut-sm) 0,
-    100% 0,
-    100% calc(100% - var(--cut-sm)),
-    calc(100% - var(--cut-sm)) 100%,
-    0 100%,
-    0 var(--cut-sm)
-  );
+  padding: 10px 24px;
+  clip-path: none;
+  border-radius: var(--radius-pill);
   transition:
     filter 0.12s ease,
     transform 0.05s ease;
