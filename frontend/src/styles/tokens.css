@@ -7,16 +7,16 @@
 */
 
 :root {
-  --void: #14110c;
-  --panel: #1e1911;
-  --panel-raised: #26200f;
-  --signal: #f2b705;
-  --signal-dim: #8a6a12;
-  --frequency: #4dd6e8;
+  --void: #121212;
+  --panel: #181818;
+  --panel-raised: #282828;
+  --signal: #1db954;
+  --signal-dim: #158a3e;
+  --frequency: #1db954;
   --alert: #e8433d;
-  --ink: #ece4d3;
-  --dim: #8a8371;
-  --line: #332c1c;
+  --ink: #ffffff;
+  --dim: #b3b3b3;
+  --line: #282828;
 
   --font-display: "Chakra Petch", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
