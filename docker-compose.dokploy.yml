@@ -1,28 +1,6 @@
+name: chomelo-stack
+
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-chomelo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chomelo}
-      POSTGRES_DB: ${POSTGRES_DB:-chomelo}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chomelo}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
   backend:
     build: ./backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-server-header
@@ -37,11 +15,6 @@ services:
       CHOMELO_ADD_TRACK_COST_CREDITS: ${CHOMELO_ADD_TRACK_COST_CREDITS:-5}
       CHOMELO_JWT_SECRET: ${CHOMELO_JWT_SECRET:-change-me-in-production}
       CHOMELO_CORS_ORIGINS: ${CHOMELO_CORS_ORIGINS:-["https://jukebox.chomelo.org"]}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)\""]
       interval: 10s
@@ -56,11 +29,6 @@ services:
       CHOMELO_ENVIRONMENT: production
       CHOMELO_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-chomelo}:${POSTGRES_PASSWORD:-chomelo}@db:5432/${POSTGRES_DB:-chomelo}
       CHOMELO_REDIS_URL: redis://redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:9000/health', timeout=2)\""]
       interval: 10s
@@ -92,5 +60,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-volumes:
-  pgdata:
+networks:
+  default:
+    external: true
+    name: chomelo-jukebox_default
