@@ -174,10 +174,11 @@ def _normalize_event(data: dict) -> ProviderEvent:
 class WompiPaymentProvider(PaymentProvider):
     key = "wompi"
 
-    def __init__(self, public_key: str, private_key: str, events_secret: str) -> None:
+    def __init__(self, public_key: str, private_key: str, events_secret: str, payment_link: str = "") -> None:
         self._public_key = public_key
         self._private_key = private_key
         self._events_secret = events_secret
+        self._payment_link = payment_link or "https://checkout.wompi.co/l/VPOS_yJJIDR"
 
     async def create_checkout(
         self,
@@ -189,17 +190,8 @@ class WompiPaymentProvider(PaymentProvider):
         success_url: str,
         cancel_url: str,
     ) -> CheckoutResult:
-        session_id = f"wompi_{uuid4().hex}"
-        params = {
-            "public-key": self._public_key,
-            "currency": currency.upper(),
-            "amount-in-cents": str(amount_cents),
-            "reference": session_id,
-            "redirect-url": success_url,
-        }
-        qs = "&".join(f"{k}={v}" for k, v in params.items())
-        checkout_url = f"https://checkout.wompi.co/p/?{qs}"
-        return CheckoutResult(session_id=session_id, checkout_url=checkout_url)
+        session_id = self._payment_link.rstrip("/").split("/")[-1]
+        return CheckoutResult(session_id=session_id, checkout_url=self._payment_link)
 
     async def verify_event(self, payload: bytes, signature: str) -> ProviderEvent:
         data = _json_loads(payload)
@@ -245,6 +237,9 @@ def get_payment_provider() -> PaymentProvider:
         if not settings.wompi_public_key or not settings.wompi_private_key:
             raise PaymentProviderError("Wompi no está configurado")
         return WompiPaymentProvider(
-            settings.wompi_public_key, settings.wompi_private_key, settings.wompi_events_secret
+            settings.wompi_public_key,
+            settings.wompi_private_key,
+            settings.wompi_events_secret,
+            settings.wompi_payment_link,
         )
     return MockPaymentProvider()

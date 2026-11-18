@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     wompi_public_key: str = ""
     wompi_private_key: str = ""
     wompi_events_secret: str = ""
+    wompi_payment_link: str = "https://checkout.wompi.co/l/VPOS_yJJIDR"
     cents_per_credit: int = 10
 
     # 5173: app de oyentes; 5174: consola de admin (orígenes separados a
