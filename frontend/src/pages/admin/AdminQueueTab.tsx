@@ -58,7 +58,7 @@ export function AdminQueueTab() {
         <PlayerReadout item={playing} player={data.player} positionAt={fetchedAt} />
       </Panel>
 
-      <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} />
+      <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} buyHref={undefined} />
 
       {error && (
         <p className="error-text" style={{ marginBottom: 12 }} role="alert">

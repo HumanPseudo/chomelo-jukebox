@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { music, queue } from "../../lib/endpoints";
+import { ApiError } from "../../lib/api";
 import type { TrackInfo } from "../../lib/types";
 import { Button, Input, Panel } from "../../components/ui";
 import { formatDuration } from "./QueueTab";
@@ -11,13 +13,16 @@ import { formatDuration } from "./QueueTab";
 export function AddTrackPanel({
   jukeboxId,
   onAdded,
+  buyHref = "/wallet",
 }: {
   jukeboxId: number;
   onAdded: () => void;
+  buyHref?: string;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<TrackInfo[]>([]);
   const [searching, setSearching] = useState(false);
+  const [addError, setAddError] = useState("");
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -31,10 +36,19 @@ export function AddTrackPanel({
   }
 
   async function addTrack(trackId: string) {
-    await queue.add(jukeboxId, trackId);
-    setResults([]);
-    setQ("");
-    onAdded();
+    setAddError("");
+    try {
+      await queue.add(jukeboxId, trackId);
+      setResults([]);
+      setQ("");
+      onAdded();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "add_track_cooldown") {
+        setAddError("espera para añadir gratis o usa créditos");
+      } else {
+        setAddError("no se pudo añadir");
+      }
+    }
   }
 
   return (
@@ -50,6 +64,17 @@ export function AddTrackPanel({
           buscar
         </Button>
       </form>
+      {addError && (
+        <p className="error-text" style={{ marginTop: 8 }}>
+          {addError}
+          {buyHref && (
+            <>
+              {" · "}
+              <Link to={buyHref}>comprar créditos</Link>
+            </>
+          )}
+        </p>
+      )}
       {results.length > 0 && (
         <div className="search-results">
           {results.map((t) => (
