@@ -8,7 +8,6 @@ function adminEntry(): Plugin | null {
     name: 'admin-entry',
     transformIndexHtml(html) {
       return html
-        .replace('/src/main.tsx', '/src/admin-main.tsx')
         .replace('/favicon.svg', '/favicon-admin.svg')
         .replace(
           '<title>Chomelo — jukebox clandestina</title>',
