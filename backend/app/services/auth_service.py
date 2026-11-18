@@ -85,6 +85,25 @@ async def authenticate(db: AsyncSession, payload: LoginRequest, client_ip: str |
         raise AppError("credenciales inválidas", code="invalid_credentials", status_code=401)
     if not user.is_active:
         raise AppError("usuario inactivo", code="user_inactive", status_code=403)
+
+    membership_exists = (
+        await db.execute(
+            select(JukeboxMember).where(JukeboxMember.user_id == user.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if membership_exists is None:
+        default_jb = (
+            await db.execute(
+                select(Jukebox).where(Jukebox.name == "Jukebox").order_by(Jukebox.id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if default_jb is None:
+            default_jb = (
+                await db.execute(select(Jukebox).order_by(Jukebox.id).limit(1))
+            ).scalar_one_or_none()
+        if default_jb is not None:
+            db.add(JukeboxMember(user_id=user.id, role=Role.MEMBER.value))
+            await db.commit()
     return user
 
 
