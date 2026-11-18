@@ -20,6 +20,7 @@ export function AdminOverview() {
   const [activity, setActivity] = useState<ActivityOut[] | null>(null);
   const [cooldown, setCooldown] = useState(jukebox.add_track_cooldown_seconds);
   const [cost, setCost] = useState(jukebox.add_track_cost_credits);
+  const [boostCost, setBoostCost] = useState(jukebox.boost_cost_credits);
   const [savingCfg, setSavingCfg] = useState(false);
 
   const reload = useCallback(async () => {
@@ -46,7 +47,8 @@ export function AdminOverview() {
   useEffect(() => {
     setCooldown(jukebox.add_track_cooldown_seconds);
     setCost(jukebox.add_track_cost_credits);
-  }, [jukebox.add_track_cooldown_seconds, jukebox.add_track_cost_credits]);
+    setBoostCost(jukebox.boost_cost_credits);
+  }, [jukebox.add_track_cooldown_seconds, jukebox.add_track_cost_credits, jukebox.boost_cost_credits]);
 
   async function saveConfig() {
     setSavingCfg(true);
@@ -54,6 +56,7 @@ export function AdminOverview() {
       await jukeboxes.update(jukebox.id, {
         add_track_cooldown_seconds: cooldown,
         add_track_cost_credits: cost,
+        boost_cost_credits: boostCost,
       });
     } finally {
       setSavingCfg(false);
@@ -176,6 +179,13 @@ export function AdminOverview() {
               type="number"
               value={cost}
               onChange={(e) => setCost(Number(e.target.value))}
+            />
+          </Field>
+          <Field label="costo en créditos para impulsar (boost)">
+            <Input
+              type="number"
+              value={boostCost}
+              onChange={(e) => setBoostCost(Number(e.target.value))}
             />
           </Field>
           <Button size="sm" disabled={savingCfg} onClick={saveConfig}>

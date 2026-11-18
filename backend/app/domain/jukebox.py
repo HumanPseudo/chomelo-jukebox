@@ -43,6 +43,7 @@ class Jukebox(Base, TimestampMixin):
         Integer, nullable=False, server_default="0"
     )
     add_track_cost_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    boost_cost_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
 
     members: Mapped[list[JukeboxMember]] = relationship(
         back_populates="jukebox",

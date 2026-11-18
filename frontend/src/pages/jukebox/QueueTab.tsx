@@ -8,7 +8,7 @@ import { Empty, Panel } from "../../components/ui";
 import { PlayerReadout } from "./PlayerReadout";
 import { AddTrackPanel } from "./AddTrackPanel";
 
-const BOOST_COST = 10;
+
 
 export function QueueTab() {
   const { jukebox, lastEvent } = useJukebox();
@@ -39,7 +39,7 @@ export function QueueTab() {
   async function boost(itemId: number) {
     setBoostError(null);
     try {
-      await queue.boost(jukebox.id, itemId, BOOST_COST);
+      await queue.boost(jukebox.id, itemId, jukebox.boost_cost_credits);
       reload();
     } catch (err) {
       setBoostError({
@@ -113,7 +113,7 @@ export function QueueTab() {
               onClick={() => boost(item.id)}
               title="gastar créditos para priorizar"
             >
-              ⚡ {BOOST_COST}
+               ⚡ {jukebox.boost_cost_credits}
             </button>
             <button
               className={`vote-btn ${item.voted_by_me ? "is-voted" : ""}`}
