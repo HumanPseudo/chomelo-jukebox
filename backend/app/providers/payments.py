@@ -234,7 +234,7 @@ def get_payment_provider() -> PaymentProvider:
             raise PaymentProviderError("Stripe no está configurado")
         return StripePaymentProvider(settings.stripe_secret_key, settings.stripe_webhook_secret)
     if settings.payment_provider == "wompi":
-        if not settings.wompi_public_key or not settings.wompi_private_key:
+        if not settings.wompi_payment_link:
             raise PaymentProviderError("Wompi no está configurado")
         return WompiPaymentProvider(
             settings.wompi_public_key,

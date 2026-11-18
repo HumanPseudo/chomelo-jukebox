@@ -37,6 +37,8 @@ services:
       CHOMELO_DATABASE_URL: postgresql+asyncpg://chomelo:chomelo@db:5432/chomelo
       CHOMELO_REDIS_URL: redis://redis:6379/0
       CHOMELO_WORKER_URL: http://worker:9000
+      CHOMELO_PAYMENT_PROVIDER: wompi
+      CHOMELO_WOMPI_PAYMENT_LINK: https://checkout.wompi.co/l/VPOS_yJJIDR
       CHOMELO_JWT_SECRET: dev-secret-key-change-in-prod
       CHOMELO_CORS_ORIGINS: '["https://jukebox.chomelo.org","http://localhost:5173","http://localhost:5174"]'
     depends_on:
