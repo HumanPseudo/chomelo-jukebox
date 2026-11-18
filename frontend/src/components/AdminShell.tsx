@@ -22,11 +22,6 @@ export function AdminShell() {
           <NavLink to="/" end className={navClass}>
             Consolas
           </NavLink>
-          {user?.is_superuser && (
-            <span className="shell__nav-item" style={{ cursor: "default" }}>
-              superusuario
-            </span>
-          )}
         </nav>
         <div className="shell__user">
           <SignalDot state="live" />

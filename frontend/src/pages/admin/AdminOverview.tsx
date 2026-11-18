@@ -166,7 +166,7 @@ export function AdminOverview() {
         </Panel>
 
         <Panel>
-          <h3 style={{ marginTop: 0 }}>configuración de créditos</h3>
+          <h3 style={{ marginTop: 0 }}>precios (créditos y COP)</h3>
           <Field label="cooldown para canción gratis (segundos)">
             <Input
               type="number"
