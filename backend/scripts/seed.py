@@ -27,20 +27,38 @@ JUKEBOX_NAME = "Jukebox"
 SEED_CREDITS = 20
 
 
-async def _get_or_create_user(db, phone: str, display_name: str, *, is_superuser: bool = False) -> User:
-    existing = (await db.execute(select(User).where(User.phone_number == phone))).scalar_one_or_none()
+async def _get_or_create_user(db, phone: str, display_name: str, *, is_superuser: bool = False, email: str | None = None) -> User:
+    conditions = [User.phone_number == phone]
+    if email:
+        conditions = [User.phone_number == phone, User.email == email]
+    from sqlalchemy import or_
+    existing = (
+        await db.execute(select(User).where(or_(*conditions)).order_by(User.id))
+    ).scalars().first()
     if existing is not None:
+        if email and existing.email != email:
+            from sqlalchemy import update
+            await db.execute(update(User).where(User.email == email, User.id != existing.id).values(email=None))
+            existing.email = email
+        if existing.phone_number != phone:
+            # avoid unique conflict: clear phone from any other user
+            from sqlalchemy import update
+            await db.execute(update(User).where(User.phone_number == phone, User.id != existing.id).values(phone_number=None))
+            existing.phone_number = phone
         if is_superuser and not existing.is_superuser:
             existing.is_superuser = True
-            await db.commit()
+        await db.commit()
+        await db.refresh(existing)
         return existing
     user = await register_user(
         db, RegisterRequest(phone_number=phone, password=PASSWORD, display_name=display_name)
     )
+    if email:
+        user.email = email
     if is_superuser:
         user.is_superuser = True
-        await db.commit()
-        await db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
@@ -49,6 +67,10 @@ async def _get_or_create_jukebox(db, admin: User) -> Jukebox:
         await db.execute(select(Jukebox).where(Jukebox.owner_id == admin.id))
     ).scalar_one_or_none()
     if existing is not None:
+        if existing.name != JUKEBOX_NAME:
+            existing.name = JUKEBOX_NAME
+            await db.commit()
+            await db.refresh(existing)
         return existing
     out = await jukebox_service.create_jukebox(
         db, admin, JukeboxCreate(name=JUKEBOX_NAME, description="Seed de desarrollo")
@@ -58,7 +80,7 @@ async def _get_or_create_jukebox(db, admin: User) -> Jukebox:
 
 async def main() -> None:
     async with SessionLocal() as db:
-        admin = await _get_or_create_user(db, ADMIN_PHONE, "Admin", is_superuser=True)
+        admin = await _get_or_create_user(db, ADMIN_PHONE, "Admin", is_superuser=True, email="admin@chomelo.dev")
         if not admin.email:
             admin.email = "admin@chomelo.dev"
             await db.commit()
@@ -66,11 +88,7 @@ async def main() -> None:
         jukebox = await _get_or_create_jukebox(db, admin)
 
         members = [await _get_or_create_user(db, p, f"Oyente {i}") for i, p in enumerate(MEMBER_PHONES, start=1)]
-        for member in members:
-            try:
-                await jukebox_service.join_by_code(db, member, jukebox.invite_code)
-            except AppError:
-                pass  # ya es miembro
+        # Los oyentes ya quedan unidos automáticamente al registrarse.
 
         for user in [admin, *members]:
             await wallet_service.credit(

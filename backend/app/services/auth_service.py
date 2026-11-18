@@ -50,7 +50,7 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
             )
         ).scalar_one_or_none()
         if already is None:
-            db.add(JukeboxMember(user_id=user.id, role=Role.MEMBER.value))
+            db.add(JukeboxMember(jukebox_id=default_jb.id, user_id=user.id, role=Role.MEMBER.value))
             await db.commit()
     return user
 
@@ -102,7 +102,7 @@ async def authenticate(db: AsyncSession, payload: LoginRequest, client_ip: str |
                 await db.execute(select(Jukebox).order_by(Jukebox.id).limit(1))
             ).scalar_one_or_none()
         if default_jb is not None:
-            db.add(JukeboxMember(user_id=user.id, role=Role.MEMBER.value))
+            db.add(JukeboxMember(jukebox_id=default_jb.id, user_id=user.id, role=Role.MEMBER.value))
             await db.commit()
     return user
 

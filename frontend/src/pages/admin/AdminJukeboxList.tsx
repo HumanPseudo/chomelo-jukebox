@@ -24,6 +24,12 @@ export function AdminJukeboxList() {
 
   const consoles = list?.filter((jb) => jb.role === "ADMIN");
 
+  useEffect(() => {
+    if (consoles && consoles.length === 1) {
+      navigate(`/${consoles[0].id}`, { replace: true });
+    }
+  }, [consoles, navigate]);
+
   return (
     <div>
       <h1>Consolas</h1>
