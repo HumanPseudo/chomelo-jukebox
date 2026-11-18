@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import AppError
 from app.domain.jukebox import JukeboxMember, Role
 from app.domain.queue import Player, QueueItem, QueueStatus
@@ -132,6 +133,46 @@ async def add_to_queue(
 ) -> QueueItem:
     track = await music_service.get_track(provider, track_id)
     queued = await _queued(db, member.jukebox_id)
+
+    # Modelo de engagement: una canción gratis cada `add_track_cooldown_seconds`;
+    # si el usuario ya añadió dentro de la ventana, puede seguir añadiendo
+    # gastando créditos (add_track_cost_credits).
+    paid = False
+    if settings.add_track_cooldown_seconds > 0:
+        last_row = (
+            await db.execute(
+                select(QueueItem)
+                .where(
+                    QueueItem.jukebox_id == member.jukebox_id,
+                    QueueItem.added_by == member.user_id,
+                )
+                .order_by(QueueItem.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if last_row is not None:
+            last_at = last_row.created_at
+            if last_at.tzinfo is None:
+                last_at = last_at.replace(tzinfo=UTC)
+            elapsed = (datetime.now(UTC) - last_at).total_seconds()
+            if elapsed < settings.add_track_cooldown_seconds:
+                try:
+                    await wallet_service.debit(
+                        db,
+                        member.user_id,
+                        settings.add_track_cost_credits,
+                        idempotency_key=f"add_track_paid:{member.user_id}:{uuid4().hex}",
+                        kind="add_track_paid",
+                        description="Añadiste una canción usando créditos",
+                    )
+                except AppError:
+                    raise AppError(
+                        "espera para añadir gratis o usa créditos",
+                        code="add_track_cooldown",
+                        status_code=409,
+                    )
+                paid = True
+
     item = QueueItem(
         jukebox_id=member.jukebox_id,
         track_id=track.track_id,
@@ -146,14 +187,15 @@ async def add_to_queue(
     db.add(item)
     await db.flush()
     await xp_service.grant_xp(db, member.user_id, xp_service.ADD_TRACK)
-    await wallet_service.credit(
-        db,
-        member.user_id,
-        wallet_service.ADD_TRACK_CREDIT,
-        idempotency_key=f"add_track:{member.user_id}:{item.id}",
-        kind="add_track",
-        description="Añadiste una canción a la cola",
-    )
+    if not paid:
+        await wallet_service.credit(
+            db,
+            member.user_id,
+            wallet_service.ADD_TRACK_CREDIT,
+            idempotency_key=f"add_track:{member.user_id}:{item.id}",
+            kind="add_track",
+            description="Añadiste una canción a la cola",
+        )
     await db.commit()
     await db.refresh(item)
     await notify_jukebox(member.jukebox_id, "queue.updated", item_id=item.id)

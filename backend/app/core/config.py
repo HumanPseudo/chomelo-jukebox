@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     wompi_events_secret: str = ""
     wompi_payment_link: str = "https://checkout.wompi.co/l/VPOS_yJJIDR"
     cents_per_credit: int = 10
+    add_track_cooldown_seconds: int = 0
+    add_track_cost_credits: int = 5
 
     # 5173: app de oyentes; 5174: consola de admin (orígenes separados a
     # propósito para que cada una tenga su propio localStorage/sesión).
