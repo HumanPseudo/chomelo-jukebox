@@ -73,7 +73,7 @@ export function QueueTab() {
   return (
     <div>
       <Panel live style={{ marginBottom: "24px" }}>
-        <PlayerReadout item={playing} player={data.player} positionAt={fetchedAt} />
+        <PlayerReadout item={playing} player={data.player} positionAt={fetchedAt} showProgress={false} />
       </Panel>
 
       <AddTrackPanel

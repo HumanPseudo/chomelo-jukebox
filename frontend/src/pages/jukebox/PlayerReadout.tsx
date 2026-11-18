@@ -20,11 +20,13 @@ export function PlayerReadout({
   player,
   controls,
   positionAt,
+  showProgress = true,
 }: {
   item: QueueItemOut | undefined;
   player: PlayerStateOut;
   controls?: ReactNode;
   positionAt?: number;
+  showProgress?: boolean;
 }) {
   const fallbackAnchor = useRef(Date.now());
   const [, tick] = useState(0);
@@ -70,16 +72,20 @@ export function PlayerReadout({
         <Tag live={player.is_playing}>{player.is_playing ? "en vivo" : "en pausa"}</Tag>
         <h2 style={{ margin: "6px 0 2px" }}>{item.title}</h2>
         <span style={{ color: "var(--dim)", fontSize: 13 }}>{item.artist || "desconocido"}</span>
-        <div className="player__progress">
-          <div className="player__progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-        <div
-          className="mono"
-          style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 4 }}
-        >
-          <span>{formatDuration(Math.floor(shownMs / 1000))}</span>
-          <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
-        </div>
+        {showProgress && (
+          <>
+            <div className="player__progress">
+              <div className="player__progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div
+              className="mono"
+              style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 4 }}
+            >
+              <span>{formatDuration(Math.floor(shownMs / 1000))}</span>
+              <span>{item.duration_seconds ? formatDuration(item.duration_seconds) : "--:--"}</span>
+            </div>
+          </>
+        )}
       </div>
       {controls}
       <SignalDot state={player.is_playing ? "rec" : "idle"} />
