@@ -12,6 +12,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.domain.jukebox import Jukebox, JukeboxMember, Role
 from app.domain.user import Profile, User
 from app.infra.rate_limit import is_rate_limited
 
@@ -29,6 +30,28 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    default_jb = (
+        await db.execute(
+            select(Jukebox).where(Jukebox.name == "Jukebox").order_by(Jukebox.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if default_jb is None:
+        default_jb = (
+            await db.execute(select(Jukebox).order_by(Jukebox.id).limit(1))
+        ).scalar_one_or_none()
+    if default_jb is not None:
+        already = (
+            await db.execute(
+                select(JukeboxMember).where(
+                    JukeboxMember.jukebox_id == default_jb.id,
+                    JukeboxMember.user_id == user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if already is None:
+            db.add(JukeboxMember(user_id=user.id, role=Role.MEMBER.value))
+            await db.commit()
     return user
 
 

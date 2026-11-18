@@ -23,7 +23,7 @@ from app.services.auth_service import register_user
 ADMIN_PHONE = "+573001234567"
 MEMBER_PHONES = ["+573009876543", "+573009876544"]
 PASSWORD = "chomelo1234"
-JUKEBOX_NAME = "Jukebox de Prueba"
+JUKEBOX_NAME = "Jukebox"
 SEED_CREDITS = 20
 
 
