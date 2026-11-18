@@ -11,19 +11,23 @@ import { defineConfig, type Plugin } from 'vite'
 // app multi-página — sirviendo la app equivocada.
 function serveAdminAtRoot(): Plugin | null {
   if (process.env.VITE_ENTRY !== 'admin') return null
+  const rewrite = (req: { url?: string; method?: string; headers: Record<string, unknown> }, _res: unknown, next: () => void) => {
+    const url = req.url?.split('?')[0] ?? ''
+    const isNavigation =
+      req.method === 'GET' && !!String(req.headers.accept ?? '').includes('text/html')
+    const isFileOrInternal = /\.[a-zA-Z0-9]+$/.test(url) || url.startsWith('/@') || url.startsWith('/src/')
+    if (isNavigation && !isFileOrInternal && url !== '/admin.html') {
+      req.url = '/admin.html'
+    }
+    next()
+  }
   return {
     name: 'serve-admin-at-root',
     configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const url = req.url?.split('?')[0] ?? ''
-        const isNavigation =
-          req.method === 'GET' && !!req.headers.accept?.includes('text/html')
-        const isFileOrInternal = /\.[a-zA-Z0-9]+$/.test(url) || url.startsWith('/@') || url.startsWith('/src/')
-        if (isNavigation && !isFileOrInternal && url !== '/admin.html') {
-          req.url = '/admin.html'
-        }
-        next()
-      })
+      server.middlewares.use(rewrite)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite)
     },
   }
 }
@@ -39,6 +43,9 @@ export default defineConfig({
     proxy: {
       "/api": "http://backend:8000",
     },
+  },
+  preview: {
+    allowedHosts: ["jukebox.chomelo.org", "jukebox-admin.chomelo.org", "localhost"],
   },
   plugins: [react(), serveAdminAtRoot()],
   build: {
