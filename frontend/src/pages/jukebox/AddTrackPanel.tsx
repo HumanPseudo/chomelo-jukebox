@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { music, queue } from "../../lib/endpoints";
 import { ApiError } from "../../lib/api";
@@ -14,15 +14,31 @@ export function AddTrackPanel({
   jukeboxId,
   onAdded,
   buyHref = "/wallet",
+  cooldownEndsAt = null,
+  costCredits = 5,
 }: {
   jukeboxId: number;
   onAdded: () => void;
   buyHref?: string;
+  cooldownEndsAt?: Date | null;
+  costCredits?: number;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<TrackInfo[]>([]);
   const [searching, setSearching] = useState(false);
   const [addError, setAddError] = useState("");
+  const [now, setNow] = useState(Date.now());
+  const remainingMs = cooldownEndsAt ? Math.max(0, cooldownEndsAt.getTime() - now) : 0;
+  const inCooldown = remainingMs > 0;
+  const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
+    Math.floor((remainingMs % 60000) / 1000),
+  ).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [cooldownEndsAt]);
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -64,6 +80,15 @@ export function AddTrackPanel({
           buscar
         </Button>
       </form>
+      {inCooldown && (
+        <div className="cooldown-timer">
+          <span className="hourglass">⏳</span>
+          <span className="mono">próxima canción gratis en {remainingLabel}</span>
+          <span className="mono" style={{ color: "var(--dim)", fontSize: 12 }}>
+            o añade ahora por {costCredits} créditos
+          </span>
+        </div>
+      )}
       {addError && (
         <p className="error-text" style={{ marginTop: 8 }}>
           {addError}

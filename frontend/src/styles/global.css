@@ -309,6 +309,28 @@ textarea {
   font-family: var(--font-mono);
 }
 
+.cooldown-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--panel-raised);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.hourglass {
+  display: inline-block;
+  animation: hourglass-flip 2s ease-in-out infinite;
+}
+
+@keyframes hourglass-flip {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .signal-dot--live,
   .signal-dot--rec,

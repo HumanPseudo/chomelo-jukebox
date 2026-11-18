@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { queue } from "../../lib/endpoints";
+import { useAuth } from "../../lib/auth";
 import { useJukebox } from "../../lib/jukeboxContext";
 import { ApiError } from "../../lib/api";
 import type { QueueOut } from "../../lib/types";
@@ -11,6 +12,7 @@ const BOOST_COST = 10;
 
 export function QueueTab() {
   const { jukebox, lastEvent } = useJukebox();
+  const { user } = useAuth();
   const [data, setData] = useState<QueueOut | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [boostError, setBoostError] = useState<{ itemId: number; message: string } | null>(null);
@@ -52,6 +54,19 @@ export function QueueTab() {
 
   if (!data) return <Empty>cargando cola…</Empty>;
 
+  const myLastAdded = user
+    ? [...data.items].filter((i) => i.added_by === user.id).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0]
+    : undefined;
+  const cooldownEndsAt =
+    myLastAdded && jukebox.add_track_cooldown_seconds > 0
+      ? new Date(
+          new Date(myLastAdded.created_at).getTime() +
+            jukebox.add_track_cooldown_seconds * 1000,
+        )
+      : null;
+
   const pending = data.items.filter((i) => i.status === "QUEUED");
   const playing = data.items.find((i) => i.id === data.player.current_item_id);
 
@@ -61,7 +76,12 @@ export function QueueTab() {
         <PlayerReadout item={playing} player={data.player} positionAt={fetchedAt} />
       </Panel>
 
-      <AddTrackPanel jukeboxId={jukebox.id} onAdded={reload} />
+      <AddTrackPanel
+        jukeboxId={jukebox.id}
+        onAdded={reload}
+        cooldownEndsAt={cooldownEndsAt}
+        costCredits={jukebox.add_track_cost_credits}
+      />
 
       <Panel style={{ padding: 0 }}>
         {pending.length === 0 && <Empty>la cola está vacía · agrega la primera canción</Empty>}

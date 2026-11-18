@@ -190,8 +190,20 @@ class WompiPaymentProvider(PaymentProvider):
         success_url: str,
         cancel_url: str,
     ) -> CheckoutResult:
-        session_id = self._payment_link.rstrip("/").split("/")[-1]
-        return CheckoutResult(session_id=session_id, checkout_url=self._payment_link)
+        session_id = f"wompi_{uuid4().hex}"
+        if self._public_key:
+            params = {
+                "public-key": self._public_key,
+                "currency": currency.upper(),
+                "amount-in-cents": str(amount_cents),
+                "reference": session_id,
+                "redirect-url": success_url,
+            }
+            qs = "&".join(f"{k}={v}" for k, v in params.items())
+            checkout_url = f"https://checkout.wompi.co/p/?{qs}"
+        else:
+            checkout_url = self._payment_link
+        return CheckoutResult(session_id=session_id, checkout_url=checkout_url)
 
     async def verify_event(self, payload: bytes, signature: str) -> ProviderEvent:
         data = _json_loads(payload)
