@@ -46,7 +46,7 @@ export function AdminPaymentsTab() {
   return (
     <div>
       <Panel>
-        <h3 style={{ marginTop: 0 }}>pagos y precios</h3>
+        <h3 style={{ marginTop: 0 }}>precios (créditos y COP)</h3>
         <p style={{ color: "var(--dim)", fontSize: 13, marginTop: 0 }}>
           control total de la economía de esta frecuencia: precio del crédito en
           COP y créditos cobrados por cada evento de pago.
@@ -65,14 +65,14 @@ export function AdminPaymentsTab() {
             onChange={(e) => setCooldown(Number(e.target.value))}
           />
         </Field>
-        <Field label="créditos por añadir canción durante cooldown">
+        <Field label="costo en créditos para añadir durante cooldown">
           <Input
             type="number"
             value={cost}
             onChange={(e) => setCost(Number(e.target.value))}
           />
         </Field>
-        <Field label="créditos por impulsar (boost)">
+        <Field label="costo en créditos para impulsar (boost)">
           <Input
             type="number"
             value={boostCost}
