@@ -23,10 +23,13 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 15
     jwt_refresh_expire_days: int = 7
 
-    # Pagos: "mock" en desarrollo sin credenciales; "stripe" en producción.
+    # Pagos: "mock" en desarrollo sin credenciales; "stripe"/"wompi" en producción.
     payment_provider: str = "mock"
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    wompi_public_key: str = ""
+    wompi_private_key: str = ""
+    wompi_events_secret: str = ""
     cents_per_credit: int = 10
 
     # 5173: app de oyentes; 5174: consola de admin (orígenes separados a
