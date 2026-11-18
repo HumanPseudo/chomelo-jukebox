@@ -42,11 +42,9 @@ export default defineConfig({
   },
   plugins: [react(), serveAdminAtRoot()],
   build: {
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        admin: resolve(__dirname, 'admin.html'),
-      },
-    },
+    rollupOptions:
+      process.env.VITE_ENTRY === 'admin'
+        ? { input: { admin: resolve(__dirname, 'admin.html') } }
+        : { input: { main: resolve(__dirname, 'index.html') } },
   },
 })
