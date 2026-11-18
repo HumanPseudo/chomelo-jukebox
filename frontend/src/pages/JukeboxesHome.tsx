@@ -8,7 +8,6 @@ import { Button, Empty, Field, Input, Panel, Tag } from "../components/ui";
 export function JukeboxesHome() {
   const navigate = useNavigate();
   const [list, setList] = useState<JukeboxOut[] | null>(null);
-  const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,21 +19,6 @@ export function JukeboxesHome() {
   useEffect(() => {
     reload();
   }, []);
-
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setBusy(true);
-    setError("");
-    try {
-      const jb = await jukeboxes.create(name.trim());
-      navigate(`/jukeboxes/${jb.id}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "no se pudo crear");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function onJoin(e: FormEvent) {
     e.preventDefault();
@@ -77,17 +61,6 @@ export function JukeboxesHome() {
       </div>
 
       <div className="jb-create-grid">
-        <Panel accent>
-          <h3>abrir frecuencia nueva</h3>
-          <form onSubmit={onCreate}>
-            <Field label="nombre">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Button type="submit" disabled={busy}>
-              transmitir
-            </Button>
-          </form>
-        </Panel>
         <Panel>
           <h3>unirse con código</h3>
           <form onSubmit={onJoin}>
