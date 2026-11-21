@@ -1,10 +1,13 @@
 import hashlib
 import json
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from httpx import AsyncClient
 
+from app.api.schemas.payment import CheckoutRequest, PricingUpdate
 from app.core.config import settings
+from app.domain.user import User
 from app.main import app
 from app.providers.payments import (
     PaymentProvider,
@@ -13,6 +16,7 @@ from app.providers.payments import (
     WompiPaymentProvider,
     get_payment_provider,
 )
+from app.services import payment_service
 from tests.helpers import BASE, auth, transport
 
 
@@ -306,3 +310,43 @@ def test_production_config_rejects_weak_secrets(monkeypatch):
     monkeypatch.setenv("CHOMELO_JWT_SECRET", "x" * 32)
     config = settings.__class__(_env_file=None)
     assert config.jwt_secret == "x" * 32
+
+
+async def test_wompi_web_checkout_sends_amount_and_integrity():
+    provider = WompiPaymentProvider(
+        "pub_test_x", "", "", "https://checkout.wompi.co/l/fallback", "integrity_secret"
+    )
+    result = await provider.create_checkout(
+        amount_cents=9500000,
+        currency="cop",
+        credits=100,
+        metadata={},
+        success_url="https://jukebox.chomelo.org/wallet?status=success",
+        cancel_url="https://jukebox.chomelo.org/wallet?status=cancelled",
+    )
+    params = parse_qs(urlparse(result.checkout_url).query)
+    assert params["amount-in-cents"] == ["9500000"]
+    assert params["currency"] == ["COP"]
+    assert params["reference"] == [result.session_id]
+    expected = hashlib.sha256(
+        f"{result.session_id}9500000COPintegrity_secret".encode()
+    ).hexdigest()
+    assert params["signature:integrity"] == [expected]
+
+
+@pytest.mark.asyncio
+async def test_admin_pricing_changes_checkout_amount(db_session):
+    user = User(phone_number="+573001234999", password_hash="hash")
+    db_session.add(user)
+    await db_session.commit()
+    pricing = await payment_service.update_pricing(
+        db_session, user.id, PricingUpdate(cents_per_credit=250, currency="cop")
+    )
+    assert pricing.cents_per_credit == 250
+
+    provider = FakePaymentProvider()
+    checkout = await payment_service.create_checkout(
+        db_session, user, provider, CheckoutRequest(credits=100)
+    )
+    assert checkout.payment.amount_cents == 25000
+    assert checkout.payment.currency == "cop"

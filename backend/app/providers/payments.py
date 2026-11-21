@@ -2,8 +2,10 @@ import hashlib
 import hmac
 import json
 from abc import ABC, abstractmethod
+from urllib.parse import urlencode
 from uuid import uuid4
 
+import httpx
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -178,10 +180,12 @@ class WompiPaymentProvider(PaymentProvider):
         private_key: str,
         events_secret: str,
         payment_link: str = "",
+        integrity_secret: str = "",
     ) -> None:
         self._public_key = public_key
         self._private_key = private_key
         self._events_secret = events_secret
+        self._integrity_secret = integrity_secret
         self._payment_link = payment_link or "https://checkout.wompi.co/l/VPOS_yJJIDR"
 
     async def create_checkout(
@@ -195,16 +199,51 @@ class WompiPaymentProvider(PaymentProvider):
         cancel_url: str,
     ) -> CheckoutResult:
         session_id = f"wompi_{uuid4().hex}"
-        if self._public_key:
+        if self._private_key:
+            base = (
+                "https://production.wompi.co"
+                if settings.environment == "production"
+                else "https://sandbox.wompi.co"
+            )
+            payload = {
+                "name": f"{credits} créditos Chomelo",
+                "description": f"Compra de {credits} créditos",
+                "single_use": True,
+                "collect_shipping": False,
+                "amount_in_cents": amount_cents,
+                "currency": currency.upper(),
+                "reference": session_id,
+                "redirect_url": success_url,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    response = await client.post(
+                        f"{base}/v1/payment_links",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {self._private_key}"},
+                    )
+                response.raise_for_status()
+                data = response.json().get("data", {})
+            except (httpx.HTTPError, ValueError) as exc:
+                raise PaymentProviderError("no se pudo crear el link de pago") from exc
+            checkout_url = data.get("url") or (
+                f"https://checkout.wompi.co/l/{data['id']}" if data.get("id") else ""
+            )
+            if not checkout_url:
+                raise PaymentProviderError("Wompi no devolvió un link de pago")
+        elif self._public_key and self._integrity_secret:
+            integrity = (
+                session_id + str(amount_cents) + currency.upper() + self._integrity_secret
+            )
             params = {
                 "public-key": self._public_key,
                 "currency": currency.upper(),
                 "amount-in-cents": str(amount_cents),
                 "reference": session_id,
+                "signature:integrity": hashlib.sha256(integrity.encode("utf-8")).hexdigest(),
                 "redirect-url": success_url,
             }
-            qs = "&".join(f"{k}={v}" for k, v in params.items())
-            checkout_url = f"https://checkout.wompi.co/p/?{qs}"
+            checkout_url = f"https://checkout.wompi.co/p/?{urlencode(params)}"
         else:
             checkout_url = self._payment_link
         return CheckoutResult(session_id=session_id, checkout_url=checkout_url)
@@ -254,12 +293,17 @@ def get_payment_provider() -> PaymentProvider:
             raise PaymentProviderError("Stripe no está configurado")
         return StripePaymentProvider(settings.stripe_secret_key, settings.stripe_webhook_secret)
     if settings.payment_provider == "wompi":
-        if not settings.wompi_payment_link:
+        has_fixed_amount = bool(
+            settings.wompi_private_key
+            or (settings.wompi_public_key and settings.wompi_integrity_secret)
+        )
+        if not settings.wompi_payment_link and not has_fixed_amount:
             raise PaymentProviderError("Wompi no está configurado")
         return WompiPaymentProvider(
             settings.wompi_public_key,
             settings.wompi_private_key,
             settings.wompi_events_secret,
             settings.wompi_payment_link,
+            settings.wompi_integrity_secret,
         )
     return MockPaymentProvider()

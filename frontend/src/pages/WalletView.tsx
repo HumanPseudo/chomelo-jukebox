@@ -59,7 +59,7 @@ export function WalletView() {
     setError("");
     setBusy(true);
     try {
-      const { checkout_url } = await payments.checkout(credits, pricing?.currency ?? "cop");
+      const { checkout_url } = await payments.checkout(credits);
       window.location.href = checkout_url;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "no se pudo iniciar la compra");

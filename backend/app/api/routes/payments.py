@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut, PricingOut
-from app.core.config import settings
+from app.api.deps import require_role
+from app.api.schemas.payment import (
+    CheckoutOut,
+    CheckoutRequest,
+    PaymentOut,
+    PricingOut,
+    PricingUpdate,
+)
 from app.core.security import get_current_user
 from app.db.session import get_db
+from app.domain.jukebox import JukeboxMember, Role
 from app.domain.user import User
 from app.providers.payments import PaymentProvider, get_payment_provider
 from app.services import audit_service, payment_service
@@ -15,11 +22,34 @@ router = APIRouter(tags=["payments"])
 @router.get("/payments/pricing", response_model=PricingOut)
 async def payment_pricing(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> PricingOut:
-    return PricingOut(
-        cents_per_credit=settings.cents_per_credit,
-        currency=settings.payment_currency.lower(),
+    cents_per_credit, currency = await payment_service.get_pricing(db)
+    return PricingOut(cents_per_credit=cents_per_credit, currency=currency)
+
+
+@router.patch("/jukeboxes/{jukebox_id}/payments/pricing", response_model=PricingOut)
+async def update_payment_pricing(
+    jukebox_id: int,
+    payload: PricingUpdate,
+    request: Request,
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> PricingOut:
+    pricing = await payment_service.update_pricing(db, member.user_id, payload)
+    await audit_service.log_action(
+        db,
+        action="payment.pricing.update",
+        user_id=member.user_id,
+        detail={
+            "jukebox_id": jukebox_id,
+            "cents_per_credit": pricing.cents_per_credit,
+            "currency": pricing.currency,
+        },
+        request=request,
     )
+    await db.commit()
+    return pricing
 
 
 @router.post("/payments/webhook")
@@ -57,7 +87,11 @@ async def create_checkout(
         user_id=current_user.id,
         resource_type="payment",
         resource_id=checkout.payment.id,
-        detail={"credits": payload.credits, "currency": payload.currency},
+        detail={
+            "credits": payload.credits,
+            "currency": checkout.payment.currency,
+            "amount_cents": checkout.payment.amount_cents,
+        },
         request=request,
     )
     await db.commit()

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,12 +8,16 @@ class CheckoutRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     credits: int = Field(ge=5, le=10000)
-    currency: str = Field(default="cop", min_length=3, max_length=3)
 
 
 class PricingOut(BaseModel):
     cents_per_credit: int
     currency: str
+
+
+class PricingUpdate(BaseModel):
+    cents_per_credit: int = Field(ge=1, le=100000)
+    currency: Literal["cop", "eur", "usd"] = "cop"
 
 
 class PaymentOut(BaseModel):

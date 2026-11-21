@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://chomelo:chomelo@db:5432/chomelo"
     redis_url: str = "redis://redis:6379/0"
     worker_url: str = "http://worker:9000"
+    frontend_url: str = "https://jukebox.chomelo.org"
 
     music_cache_ttl_seconds: int = 3600
 
@@ -32,6 +33,7 @@ class Settings(BaseSettings):
     wompi_public_key: str = ""
     wompi_private_key: str = ""
     wompi_events_secret: str = ""
+    wompi_integrity_secret: str = ""
     wompi_payment_link: str = "https://checkout.wompi.co/l/VPOS_yJJIDR"
     cents_per_credit: int = 10
     add_track_cooldown_seconds: int = 0

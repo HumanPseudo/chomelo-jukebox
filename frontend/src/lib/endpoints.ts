@@ -14,6 +14,7 @@ import type {
   PaymentOut,
   PollOut,
   PricingOut,
+  PricingUpdate,
   ProfileOut,
   QueueItemOut,
   QueueOut,
@@ -113,8 +114,10 @@ export const polls = {
 
 export const payments = {
   pricing: () => api.get<PricingOut>("/payments/pricing"),
-  checkout: (credits: number, currency = "cop") =>
-    api.post<CheckoutOut>("/users/me/payments/checkout", { credits, currency }),
+  updatePricing: (jukeboxId: number, payload: PricingUpdate) =>
+    api.patch<PricingOut>(`/jukeboxes/${jukeboxId}/payments/pricing`, payload),
+  checkout: (credits: number) =>
+    api.post<CheckoutOut>("/users/me/payments/checkout", { credits }),
   list: () => api.get<PaymentOut[]>("/users/me/payments"),
 };
 

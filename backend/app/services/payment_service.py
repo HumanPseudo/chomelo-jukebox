@@ -1,10 +1,17 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut
+from app.api.schemas.payment import (
+    CheckoutOut,
+    CheckoutRequest,
+    PaymentOut,
+    PricingOut,
+    PricingUpdate,
+)
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.domain.payment import Payment, PaymentEvent, PaymentStatus
+from app.domain.payment_pricing import PaymentPricing
 from app.domain.user import User
 from app.infra.db_utils import dialect_insert
 from app.providers.payments import PaymentProvider, PaymentProviderError
@@ -15,8 +22,30 @@ MAX_CREDITS = 10000
 ALLOWED_CURRENCIES = {"eur", "usd", "cop"}
 
 
-def _price_cents(credits: int) -> int:
-    return credits * settings.cents_per_credit
+async def get_pricing(db: AsyncSession) -> tuple[int, str]:
+    row = await db.get(PaymentPricing, 1)
+    if row is None:
+        return settings.cents_per_credit, settings.payment_currency.lower()
+    return row.cents_per_credit, row.currency.lower()
+
+
+async def update_pricing(
+    db: AsyncSession, admin_user_id: int, payload: PricingUpdate
+) -> PricingOut:
+    row = (
+        await db.execute(
+            select(PaymentPricing).where(PaymentPricing.id == 1).with_for_update()
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = PaymentPricing(id=1)
+        db.add(row)
+    row.cents_per_credit = payload.cents_per_credit
+    row.currency = payload.currency
+    row.updated_by = admin_user_id
+    await db.commit()
+    await db.refresh(row)
+    return PricingOut(cents_per_credit=row.cents_per_credit, currency=row.currency)
 
 
 def _to_out(payment: Payment) -> PaymentOut:
@@ -48,18 +77,18 @@ async def create_checkout(
             code="invalid_amount",
             status_code=422,
         )
-    currency = payload.currency.lower()
+    cents_per_credit, currency = await get_pricing(db)
     if currency not in ALLOWED_CURRENCIES:
         raise AppError("moneda no soportada", code="invalid_currency", status_code=422)
-    amount_cents = credits * settings.cents_per_credit
+    amount_cents = credits * cents_per_credit
     try:
         result = await provider.create_checkout(
             amount_cents=amount_cents,
             currency=currency,
             credits=credits,
             metadata={"user_id": str(user.id), "credits": str(credits)},
-            success_url="{{FRONTEND_URL}}/wallet?status=success",
-            cancel_url="{{FRONTEND_URL}}/wallet?status=cancelled",
+            success_url=f"{settings.frontend_url}/wallet?status=success",
+            cancel_url=f"{settings.frontend_url}/wallet?status=cancelled",
         )
     except PaymentProviderError:
         raise AppError(
