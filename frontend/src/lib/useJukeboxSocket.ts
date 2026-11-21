@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { wsUrl } from "./api";
+import { refreshTokens, wsUrl } from "./api";
 import type { WsEvent } from "./types";
 
 export type SocketStatus = "connecting" | "online" | "offline";
@@ -34,9 +34,13 @@ export function useJukeboxSocket(jukeboxId: number | null, onEvent: (ev: WsEvent
           // ignorar mensajes no-JSON (p.ej. pong crudo)
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setStatus("offline");
-        if (!closedByUs) retryTimer = setTimeout(connect, 3000);
+        if (closedByUs || event.code === 4403) return;
+        retryTimer = setTimeout(async () => {
+          if (event.code === 4401 && !(await refreshTokens())) return;
+          connect();
+        }, event.code === 4401 ? 200 : 3000);
       };
       ws.onerror = () => ws.close();
     }

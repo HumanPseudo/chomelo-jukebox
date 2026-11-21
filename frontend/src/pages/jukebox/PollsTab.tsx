@@ -23,6 +23,11 @@ export function PollsTab() {
     if (lastEvent?.event === "poll.updated") reload();
   }, [lastEvent, reload]);
 
+  useEffect(() => {
+    const timer = setInterval(reload, 30000);
+    return () => clearInterval(timer);
+  }, [reload]);
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     const clean = options.map((o) => o.trim()).filter(Boolean);

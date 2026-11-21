@@ -33,7 +33,7 @@ export const tokens = {
 
 let refreshing: Promise<boolean> | null = null;
 
-async function doRefresh(): Promise<boolean> {
+export async function refreshTokens(): Promise<boolean> {
   const refresh_token = tokens.refresh;
   if (!refresh_token) return false;
   const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -80,7 +80,7 @@ async function request<T>(path: string, opts: RequestOptions = {}, retry = true)
   });
 
   if (res.status === 401 && auth && retry) {
-    refreshing ??= doRefresh().finally(() => {
+    refreshing ??= refreshTokens().finally(() => {
       refreshing = null;
     });
     if (await refreshing) {
