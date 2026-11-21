@@ -9,7 +9,6 @@ export function AdminPaymentsTab() {
   const [cooldown, setCooldown] = useState(jukebox.add_track_cooldown_seconds);
   const [cost, setCost] = useState(jukebox.add_track_cost_credits);
   const [boostCost, setBoostCost] = useState(jukebox.boost_cost_credits);
-  const [creditPrice, setCreditPrice] = useState(jukebox.credit_price_cents);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,12 +16,10 @@ export function AdminPaymentsTab() {
     setCooldown(jukebox.add_track_cooldown_seconds);
     setCost(jukebox.add_track_cost_credits);
     setBoostCost(jukebox.boost_cost_credits);
-    setCreditPrice(jukebox.credit_price_cents);
   }, [
     jukebox.add_track_cooldown_seconds,
     jukebox.add_track_cost_credits,
     jukebox.boost_cost_credits,
-    jukebox.credit_price_cents,
   ]);
 
   async function save() {
@@ -33,7 +30,6 @@ export function AdminPaymentsTab() {
         add_track_cooldown_seconds: cooldown,
         add_track_cost_credits: cost,
         boost_cost_credits: boostCost,
-        credit_price_cents: creditPrice,
       });
       await reloadJukebox();
     } catch (err) {
@@ -46,18 +42,11 @@ export function AdminPaymentsTab() {
   return (
     <div>
       <Panel>
-        <h3 style={{ marginTop: 0 }}>precios (créditos y COP)</h3>
+        <h3 style={{ marginTop: 0 }}>economía de la frecuencia</h3>
         <p style={{ color: "var(--dim)", fontSize: 13, marginTop: 0 }}>
-          control total de la economía de esta frecuencia: precio del crédito en
-          COP y créditos cobrados por cada evento de pago.
+          el precio de compra de créditos se toma del servidor; aquí solo controlas los
+          costes internos de esta jukebox.
         </p>
-        <Field label="precio de 1 crédito en céntimos (COP)">
-          <Input
-            type="number"
-            value={creditPrice}
-            onChange={(e) => setCreditPrice(Number(e.target.value))}
-          />
-        </Field>
         <Field label="cooldown para canción gratis (segundos)">
           <Input
             type="number"

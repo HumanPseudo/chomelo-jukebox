@@ -173,6 +173,11 @@ export interface AdjustmentOut {
   credits: number;
 }
 
+export interface PricingOut {
+  cents_per_credit: number;
+  currency: string;
+}
+
 export interface PaymentOut {
   id: number;
   provider: string;

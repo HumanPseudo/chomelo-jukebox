@@ -97,6 +97,17 @@ async def test_checkout_requires_auth():
         r = await c.post("/api/v1/users/me/payments/checkout", json={"credits": 100})
         assert r.status_code == 401
         assert (await c.get("/api/v1/users/me/payments")).status_code == 401
+        assert (await c.get("/api/v1/payments/pricing")).status_code == 401
+
+
+async def test_pricing_returns_server_values():
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        token = await register_user(c, "price@test.com")
+        r = await c.get("/api/v1/payments/pricing", headers=auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cents_per_credit"] == settings.cents_per_credit
+    assert body["currency"] == settings.payment_currency.lower()
 
 
 async def test_webhook_invalid_signature_400():

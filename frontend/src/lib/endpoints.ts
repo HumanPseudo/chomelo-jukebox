@@ -10,6 +10,7 @@ import type {
   MemberOut,
   PaymentOut,
   PollOut,
+  PricingOut,
   ProfileOut,
   QueueItemOut,
   QueueOut,
@@ -106,7 +107,8 @@ export const polls = {
 };
 
 export const payments = {
-  checkout: (credits: number, currency = "eur") =>
+  pricing: () => api.get<PricingOut>("/payments/pricing"),
+  checkout: (credits: number, currency = "cop") =>
     api.post<CheckoutOut>("/users/me/payments/checkout", { credits, currency }),
   list: () => api.get<PaymentOut[]>("/users/me/payments"),
 };

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     # Pagos: "mock" en desarrollo sin credenciales; "stripe"/"wompi" en producción.
     payment_provider: str = "mock"
+    payment_currency: str = "cop"
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     wompi_public_key: str = ""
@@ -66,6 +67,8 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CHOMELO_JWT_SECRET debe ser aleatorio y de al menos 32 caracteres"
                 )
+        if self.payment_currency.lower() not in {"eur", "usd", "cop"}:
+            raise ValueError("CHOMELO_PAYMENT_CURRENCY debe ser eur, usd o cop")
         return self
 
 

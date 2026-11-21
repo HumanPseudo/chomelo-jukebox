@@ -7,7 +7,12 @@ class CheckoutRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     credits: int = Field(ge=5, le=10000)
-    currency: str = Field(default="eur", min_length=3, max_length=3)
+    currency: str = Field(default="cop", min_length=3, max_length=3)
+
+
+class PricingOut(BaseModel):
+    cents_per_credit: int
+    currency: str
 
 
 class PaymentOut(BaseModel):

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { payments, users } from "../lib/endpoints";
 import { ApiError } from "../lib/api";
-import type { PaymentOut, WalletOut } from "../lib/types";
+import type { PaymentOut, PricingOut, WalletOut } from "../lib/types";
 import { Button, Empty, Panel, Tag } from "../components/ui";
 
 const KIND_LABEL: Record<string, string> = {
@@ -30,19 +30,36 @@ const PAYMENT_STATUS_LABEL: Record<PaymentOut["status"], string> = {
 export function WalletView() {
   const [wallet, setWallet] = useState<WalletOut | null>(null);
   const [purchases, setPurchases] = useState<PaymentOut[] | null>(null);
+  const [pricing, setPricing] = useState<PricingOut | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const status = new URLSearchParams(window.location.search).get("status");
 
   useEffect(() => {
     users.wallet().then(setWallet);
     payments.list().then(setPurchases);
-  }, []);
+    payments.pricing().then(setPricing);
+    if (!status) return;
+    const timer = setTimeout(() => {
+      users.wallet().then(setWallet);
+      payments.list().then(setPurchases);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  function formatMoney(cents: number): string {
+    if (!pricing) return "…";
+    return `${(cents / 100).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} ${pricing.currency.toUpperCase()}`;
+  }
 
   async function buy(credits: number) {
     setError("");
     setBusy(true);
     try {
-      const { checkout_url } = await payments.checkout(credits);
+      const { checkout_url } = await payments.checkout(credits, pricing?.currency ?? "cop");
       window.location.href = checkout_url;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "no se pudo iniciar la compra");
@@ -55,6 +72,11 @@ export function WalletView() {
   return (
     <div>
       <h1>Créditos</h1>
+      {status && (
+        <p className="mono" style={{ color: "var(--dim)", fontSize: 12, marginBottom: 16 }}>
+          {status === "success" ? "pago iniciado; actualizando tus compras…" : "pago cancelado"}
+        </p>
+      )}
       <Panel accent style={{ marginBottom: 24 }}>
         <span className="mono" style={{ fontSize: 12, color: "var(--dim)" }}>
           saldo disponible
@@ -66,20 +88,19 @@ export function WalletView() {
 
       <Panel style={{ marginBottom: 24 }}>
         <h3>comprar créditos</h3>
-         <p style={{ color: "var(--dim)", fontSize: 13 }}>
-           te lleva a la pasarela de pago; los créditos se acreditan al confirmarse.
-         </p>
-         <p style={{ color: "var(--dim)", fontSize: 12 }}>
-           precios: 1 crédito = 10 céntimos · impulsar canción = 10 créditos ·
-           añadir en cooldown = 5 créditos
-         </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {PRESETS.map((amount) => (
-            <Button key={amount} size="sm" disabled={busy} onClick={() => buy(amount)}>
-              {amount} créditos
-            </Button>
-          ))}
-        </div>
+          <p style={{ color: "var(--dim)", fontSize: 13 }}>
+            te lleva a la pasarela de pago; los créditos se acreditan al confirmarse.
+          </p>
+          <p style={{ color: "var(--dim)", fontSize: 12 }}>
+            1 crédito = {formatMoney(pricing?.cents_per_credit ?? 0)}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {PRESETS.map((amount) => (
+              <Button key={amount} size="sm" disabled={busy} onClick={() => buy(amount)}>
+                {amount} créditos · {formatMoney(amount * (pricing?.cents_per_credit ?? 0))}
+              </Button>
+            ))}
+          </div>
         {error && (
           <p className="error-text" style={{ marginTop: 8 }}>
             {error}

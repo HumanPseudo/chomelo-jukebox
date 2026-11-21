@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut
+from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut, PricingOut
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.domain.user import User
@@ -9,6 +10,16 @@ from app.providers.payments import PaymentProvider, get_payment_provider
 from app.services import audit_service, payment_service
 
 router = APIRouter(tags=["payments"])
+
+
+@router.get("/payments/pricing", response_model=PricingOut)
+async def payment_pricing(
+    current_user: User = Depends(get_current_user),
+) -> PricingOut:
+    return PricingOut(
+        cents_per_credit=settings.cents_per_credit,
+        currency=settings.payment_currency.lower(),
+    )
 
 
 @router.post("/payments/webhook")
