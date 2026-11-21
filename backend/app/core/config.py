@@ -66,8 +66,6 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CHOMELO_JWT_SECRET debe ser aleatorio y de al menos 32 caracteres"
                 )
-            if self.payment_provider == "wompi" and not self.wompi_events_secret:
-                raise ValueError("CHOMELO_WOMPI_EVENTS_SECRET es obligatorio con Wompi")
         return self
 
 

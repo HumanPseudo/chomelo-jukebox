@@ -14,7 +14,7 @@ services:
       CHOMELO_ADD_TRACK_COOLDOWN_SECONDS: ${CHOMELO_ADD_TRACK_COOLDOWN_SECONDS:-1800}
       CHOMELO_ADD_TRACK_COST_CREDITS: ${CHOMELO_ADD_TRACK_COST_CREDITS:-5}
       CHOMELO_JWT_SECRET: ${CHOMELO_JWT_SECRET:?CHOMELO_JWT_SECRET debe definirse con un valor aleatorio}
-      CHOMELO_WOMPI_EVENTS_SECRET: ${CHOMELO_WOMPI_EVENTS_SECRET:?CHOMELO_WOMPI_EVENTS_SECRET debe definirse}
+      CHOMELO_WOMPI_EVENTS_SECRET: ${CHOMELO_WOMPI_EVENTS_SECRET:-}
       CHOMELO_CORS_ORIGINS: ${CHOMELO_CORS_ORIGINS:-["https://jukebox.chomelo.org"]}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)\""]

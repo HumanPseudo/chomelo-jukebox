@@ -179,8 +179,6 @@ class WompiPaymentProvider(PaymentProvider):
         events_secret: str,
         payment_link: str = "",
     ) -> None:
-        if not events_secret:
-            raise PaymentProviderError("Wompi requiere events_secret")
         self._public_key = public_key
         self._private_key = private_key
         self._events_secret = events_secret
@@ -212,6 +210,8 @@ class WompiPaymentProvider(PaymentProvider):
         return CheckoutResult(session_id=session_id, checkout_url=checkout_url)
 
     async def verify_event(self, payload: bytes, signature: str) -> ProviderEvent:
+        if not self._events_secret:
+            raise PaymentProviderError("Wompi requiere events_secret para webhooks")
         data = _json_loads(payload)
         sig = data.get("signature", {}) if isinstance(data.get("signature"), dict) else {}
         props = sig.get("properties", [])
@@ -256,8 +256,6 @@ def get_payment_provider() -> PaymentProvider:
     if settings.payment_provider == "wompi":
         if not settings.wompi_payment_link:
             raise PaymentProviderError("Wompi no está configurado")
-        if settings.environment == "production" and not settings.wompi_events_secret:
-            raise PaymentProviderError("Wompi requiere events_secret en producción")
         return WompiPaymentProvider(
             settings.wompi_public_key,
             settings.wompi_private_key,

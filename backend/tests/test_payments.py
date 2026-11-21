@@ -248,9 +248,10 @@ async def test_webhook_amount_mismatch_does_not_grant_credits():
     assert wallet["credits"] == 0
 
 
-def test_wompi_requires_events_secret():
+async def test_wompi_rejects_webhooks_without_events_secret():
+    provider = WompiPaymentProvider("pub", "priv", "", "https://checkout.wompi.co/l/x")
     with pytest.raises(PaymentProviderError):
-        WompiPaymentProvider("pub", "priv", "", "https://checkout.wompi.co/l/x")
+        await provider.verify_event(b'{"id":"evt_1"}', "anything")
 
 
 async def test_wompi_rejects_unsigned_event():
@@ -292,9 +293,5 @@ def test_production_config_rejects_weak_secrets(monkeypatch):
     with pytest.raises(ValueError):
         settings.__class__(_env_file=None)
     monkeypatch.setenv("CHOMELO_JWT_SECRET", "x" * 32)
-    monkeypatch.setenv("CHOMELO_PAYMENT_PROVIDER", "wompi")
-    with pytest.raises(ValueError):
-        settings.__class__(_env_file=None)
-    monkeypatch.setenv("CHOMELO_WOMPI_EVENTS_SECRET", "secret")
     config = settings.__class__(_env_file=None)
-    assert config.wompi_events_secret == "secret"
+    assert config.jwt_secret == "x" * 32
