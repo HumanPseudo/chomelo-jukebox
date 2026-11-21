@@ -57,8 +57,19 @@ class FakePaymentProvider(PaymentProvider):
             checkout_session_id=obj.get("id", self.session_id),
             paid=obj.get("payment_status") == "paid",
             amount_cents=int(obj.get("amount_total", self.amount_cents) or 0),
-            currency=obj.get("currency", "eur"),
+            currency=obj.get("currency", "cop"),
             raw=data,
+        )
+
+    async def verify_transaction(self, transaction_id: str) -> ProviderEvent:
+        return ProviderEvent(
+            event_id=f"wompi_tx:{transaction_id}",
+            event_type="checkout.session.completed",
+            checkout_session_id=self.session_id,
+            paid=True,
+            amount_cents=self.amount_cents,
+            currency="cop",
+            raw={"id": transaction_id},
         )
 
     @property
@@ -88,7 +99,7 @@ async def _webhook(
     payload = (
         f'{{"id": "{event_id or provider.event_id}", "type": "checkout.session.completed", '
         f'"data": {{"object": {{"id": "{provider.session_id}", "payment_status": "paid", '
-        f'"amount_total": {provider.amount_cents}, "currency": "eur"}}}}}}'
+        f'"amount_total": {provider.amount_cents}, "currency": "cop"}}}}}}'
     ).encode()
     return await client.post(
         "/api/v1/payments/webhook",
@@ -210,7 +221,7 @@ async def test_webhook_unknown_session_safe():
             content=(
                 b'{"id": "evt_x", "type": "checkout.session.completed", '
                 b'"data": {"object": {"id": "cs_ghost", "payment_status": "paid",'
-                b' "amount_total": 100, "currency": "eur"}}}'
+                b' "amount_total": 100, "currency": "cop"}}}'
             ),
             headers={"stripe-signature": "valid-sig"},
         )
@@ -239,7 +250,7 @@ async def test_webhook_unpaid_event_does_not_grant_credits():
         payload = (
             f'{{"id": "evt_unpaid", "type": "checkout.session.completed", '
             f'"data": {{"object": {{"id": "{provider.session_id}", "payment_status": "unpaid", '
-            f'"amount_total": {provider.amount_cents}, "currency": "eur"}}}}}}'
+            f'"amount_total": {provider.amount_cents}, "currency": "cop"}}}}}}'
         ).encode()
         r = await c.post(
             "/api/v1/payments/webhook",
@@ -361,3 +372,26 @@ async def test_admin_pricing_changes_checkout_amount(db_session):
             db_session, user, provider, CheckoutRequest(credits=500)
         )
     assert exc.value.code == "invalid_amount"
+
+
+async def test_confirm_payment_from_redirect_is_idempotent():
+    _use_fake()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        token = await register_user(c, "confirm@test.com")
+        await _checkout(c, token, credits=100)
+        first = await c.post(
+            "/api/v1/users/me/payments/confirm",
+            headers=auth(token),
+            json={"transaction_id": "01-1531231271-19365"},
+        )
+        second = await c.post(
+            "/api/v1/users/me/payments/confirm",
+            headers=auth(token),
+            json={"transaction_id": "01-1531231271-19365"},
+        )
+        wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
+    assert first.status_code == 200
+    assert first.json()["status"] == "CREDITS_GRANTED"
+    assert second.status_code == 200
+    assert second.json()["duplicate"] is True
+    assert wallet["credits"] == 100

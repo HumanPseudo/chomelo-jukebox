@@ -31,19 +31,43 @@ export function WalletView() {
   const [pricing, setPricing] = useState<PricingOut | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const status = new URLSearchParams(window.location.search).get("status");
+  const [notice, setNotice] = useState("");
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get("status");
+  const transactionId = params.get("id") || params.get("idTransaccion");
 
   useEffect(() => {
     users.wallet().then(setWallet);
     payments.list().then(setPurchases);
     payments.pricing().then(setPricing);
+    if (transactionId) {
+      setNotice("verificando el pago con Wompi…");
+      payments
+        .confirm(transactionId)
+        .then((result) => {
+          setNotice(
+            result.status === "CREDITS_GRANTED"
+              ? "pago acreditado"
+              : result.status === "FAILED"
+                ? "el pago no fue aprobado"
+                : "pago registrado; esperando confirmación",
+          );
+          return Promise.all([
+            users.wallet().then(setWallet),
+            payments.list().then(setPurchases),
+          ]);
+        })
+        .catch(() => setNotice("no se pudo verificar el pago"));
+      return;
+    }
     if (!status) return;
+    setNotice(status === "success" ? "pago iniciado; actualizando tus compras…" : "pago cancelado");
     const timer = setTimeout(() => {
       users.wallet().then(setWallet);
       payments.list().then(setPurchases);
     }, 1200);
     return () => clearTimeout(timer);
-  }, [status]);
+  }, [status, transactionId]);
 
   function formatMoney(cents: number): string {
     if (!pricing) return "…";
@@ -70,9 +94,9 @@ export function WalletView() {
   return (
     <div>
       <h1>Créditos</h1>
-      {status && (
+      {notice && (
         <p className="mono" style={{ color: "var(--dim)", fontSize: 12, marginBottom: 16 }}>
-          {status === "success" ? "pago iniciado; actualizando tus compras…" : "pago cancelado"}
+          {notice}
         </p>
       )}
       <Panel accent style={{ marginBottom: 24 }}>

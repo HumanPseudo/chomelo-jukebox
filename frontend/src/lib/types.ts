@@ -249,6 +249,12 @@ export interface CheckoutOut {
   checkout_url: string;
 }
 
+export interface ConfirmOut {
+  status: PaymentOut["status"];
+  credits: number;
+  duplicate: boolean;
+}
+
 export interface WsEvent {
   event: string;
   jukebox_id?: number;

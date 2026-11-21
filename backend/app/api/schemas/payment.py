@@ -10,6 +10,18 @@ class CheckoutRequest(BaseModel):
     credits: int = Field(ge=5, le=10000)
 
 
+class ConfirmPaymentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transaction_id: str = Field(min_length=1, max_length=64)
+
+
+class ConfirmOut(BaseModel):
+    status: str
+    credits: int
+    duplicate: bool = False
+
+
 class PricingOut(BaseModel):
     cents_per_credit: int
     currency: str

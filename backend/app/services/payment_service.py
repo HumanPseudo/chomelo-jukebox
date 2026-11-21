@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas.payment import (
     CheckoutOut,
     CheckoutRequest,
+    ConfirmOut,
+    ConfirmPaymentRequest,
     PaymentOut,
     PricingOut,
     PricingUpdate,
@@ -127,51 +129,51 @@ async def create_checkout(
     return CheckoutOut(payment=_to_out(payment), checkout_url=result.checkout_url)
 
 
-async def consume_webhook(
-    db: AsyncSession, provider: PaymentProvider, payload: bytes, signature: str
-) -> dict:
-    try:
-        event = await provider.verify_event(payload, signature)
-    except PaymentProviderError:
-        raise AppError(
-            "firma de webhook inválida", code="invalid_signature", status_code=400
-        ) from None
-
+async def _process_event(
+    db: AsyncSession, provider_event, *, user_id: int | None = None
+) -> tuple[dict, Payment | None]:
     payment = (
         (
             await db.execute(
-                select(Payment).where(Payment.provider_session_id == event.checkout_session_id)
+                select(Payment).where(
+                    Payment.provider_session_id == provider_event.checkout_session_id
+                )
             )
         ).scalar_one_or_none()
-        if event.checkout_session_id
+        if provider_event.checkout_session_id
         else None
     )
+    if user_id is not None:
+        if payment is None or payment.user_id != user_id:
+            raise AppError("pago no encontrado", code="payment_not_found", status_code=404)
 
-    # ON CONFLICT DO NOTHING: dos entregas concurrentes del mismo evento
-    # (reintento del proveedor) no deben procesarse dos veces (regla dura #3).
     result = await db.execute(
         dialect_insert(db, PaymentEvent)
         .values(
-            provider_event_id=event.event_id,
+            provider_event_id=provider_event.event_id,
             payment_id=payment.id if payment else None,
-            event_type=event.event_type,
-            payload=event.raw,
+            event_type=provider_event.event_type,
+            payload=provider_event.raw,
         )
         .on_conflict_do_nothing(index_elements=["provider_event_id"])
     )
     if result.rowcount == 0:
         await db.commit()
-        return {"received": True, "duplicate": True}
+        return {"received": True, "duplicate": True}, payment
 
     if (
-        event.is_completed_checkout
+        provider_event.is_completed_checkout
         and payment
         and payment.status != PaymentStatus.CREDITS_GRANTED.value
     ):
-        if not event.paid or event.amount_cents != payment.amount_cents:
+        if (
+            not provider_event.paid
+            or provider_event.amount_cents != payment.amount_cents
+            or provider_event.currency.lower() != payment.currency.lower()
+        ):
             payment.status = PaymentStatus.FAILED.value
             await db.commit()
-            return {"received": True, "ignored": "payment_not_confirmed"}
+            return {"received": True, "ignored": "payment_not_confirmed"}, payment
         payment.status = PaymentStatus.PROCESSED.value
         await wallet_service.credit(
             db,
@@ -184,7 +186,41 @@ async def consume_webhook(
         payment.status = PaymentStatus.CREDITS_GRANTED.value
 
     await db.commit()
-    return {"received": True}
+    return {"received": True}, payment
+
+
+async def consume_webhook(
+    db: AsyncSession, provider: PaymentProvider, payload: bytes, signature: str
+) -> dict:
+    try:
+        provider_event = await provider.verify_event(payload, signature)
+    except PaymentProviderError:
+        raise AppError(
+            "firma de webhook inválida", code="invalid_signature", status_code=400
+        ) from None
+    result, _payment = await _process_event(db, provider_event)
+    return result
+
+
+async def confirm_payment(
+    db: AsyncSession,
+    user: User,
+    provider: PaymentProvider,
+    payload: ConfirmPaymentRequest,
+) -> ConfirmOut:
+    try:
+        provider_event = await provider.verify_transaction(payload.transaction_id)
+    except PaymentProviderError:
+        raise AppError(
+            "no se pudo verificar el pago", code="payment_verification_failed", status_code=502
+        ) from None
+    result, payment = await _process_event(db, provider_event, user_id=user.id)
+    assert payment is not None
+    return ConfirmOut(
+        status=payment.status,
+        credits=payment.credits,
+        duplicate=bool(result.get("duplicate")),
+    )
 
 
 async def list_payments(db: AsyncSession, user: User, limit: int, offset: int) -> list[PaymentOut]:

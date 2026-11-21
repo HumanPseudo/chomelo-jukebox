@@ -5,6 +5,7 @@ import type {
   AttemptOut,
   AuditOut,
   CheckoutOut,
+  ConfirmOut,
   JukeboxOut,
   ListenHistoryItem,
   MemberOut,
@@ -118,6 +119,8 @@ export const payments = {
     api.patch<PricingOut>(`/jukeboxes/${jukeboxId}/payments/pricing`, payload),
   checkout: (credits: number) =>
     api.post<CheckoutOut>("/users/me/payments/checkout", { credits }),
+  confirm: (transactionId: string) =>
+    api.post<ConfirmOut>("/users/me/payments/confirm", { transaction_id: transactionId }),
   list: () => api.get<PaymentOut[]>("/users/me/payments"),
 };
 

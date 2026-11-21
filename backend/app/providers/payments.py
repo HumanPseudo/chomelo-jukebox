@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import re
 from abc import ABC, abstractmethod
 from urllib.parse import urlencode
 from uuid import uuid4
@@ -64,6 +65,9 @@ class PaymentProvider(ABC):
         Lanza PaymentProviderError si la firma no es válida.
         """
         ...
+
+    async def verify_transaction(self, transaction_id: str) -> ProviderEvent:
+        raise PaymentProviderError("el proveedor no soporta verificación por id")
 
 
 class StripePaymentProvider(PaymentProvider):
@@ -283,6 +287,37 @@ class WompiPaymentProvider(PaymentProvider):
             paid=(status == "APPROVED"),
             amount_cents=int(tx.get("amount_in_cents", 0) or 0),
             currency=str(tx.get("currency", "cop") or "cop"),
+            raw=data,
+        )
+
+    async def verify_transaction(self, transaction_id: str) -> ProviderEvent:
+        if not self._private_key:
+            raise PaymentProviderError("Wompi requiere llave privada para verificar pagos")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", transaction_id):
+            raise PaymentProviderError("id de transacción inválido")
+        base = (
+            "https://production.wompi.co"
+            if settings.environment == "production"
+            else "https://sandbox.wompi.co"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(
+                    f"{base}/v1/transactions/{transaction_id}",
+                    headers={"Authorization": f"Bearer {self._private_key}"},
+                )
+            response.raise_for_status()
+            data = response.json().get("data", {})
+        except (httpx.HTTPError, ValueError) as exc:
+            raise PaymentProviderError("no se pudo verificar la transacción") from exc
+        status = str(data.get("status", "")).upper()
+        return ProviderEvent(
+            event_id=f"wompi_tx:{data.get('id', transaction_id)}",
+            event_type=COMPLETED_CHECKOUT_EVENT,
+            checkout_session_id=str(data.get("reference", "")) or None,
+            paid=status == "APPROVED",
+            amount_cents=int(data.get("amount_in_cents", 0) or 0),
+            currency=str(data.get("currency", "cop") or "cop").lower(),
             raw=data,
         )
 
