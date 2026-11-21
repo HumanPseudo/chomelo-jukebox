@@ -11,13 +11,20 @@ from app.api.schemas.jukebox import (
     MemberOut,
     RoleUpdate,
 )
+from app.api.schemas.wallet import CreditAdjustment, CreditAdjustmentOut, WalletOut
 from app.core.exceptions import AppError
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.domain.jukebox import JukeboxMember, Role
 from app.domain.user import User
 from app.infra.rate_limit import is_rate_limited
-from app.services import activity_service, audit_service, jukebox_service
+from app.services import (
+    activity_service,
+    audit_service,
+    jukebox_service,
+    reward_service,
+    wallet_service,
+)
 
 router = APIRouter(prefix="/jukeboxes", tags=["jukeboxes"])
 
@@ -173,3 +180,52 @@ async def remove_jukebox_member(
         request=request,
     )
     await db.commit()
+
+
+@router.get("/{jukebox_id}/members/{user_id}/wallet", response_model=WalletOut)
+async def member_wallet(
+    user_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    member: JukeboxMember = Depends(require_role(Role.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> WalletOut:
+    return await reward_service.member_wallet(
+        db, jukebox_id=member.jukebox_id, user_id=user_id, limit=limit
+    )
+
+
+@router.post("/{jukebox_id}/members/{user_id}/credits", response_model=CreditAdjustmentOut)
+async def adjust_member_credits(
+    user_id: int,
+    payload: CreditAdjustment,
+    request: Request,
+    actor: JukeboxMember = Depends(require_role(Role.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> CreditAdjustmentOut:
+    key = reward_service.adjustment_key(actor.jukebox_id, user_id, payload.idempotency_key)
+    applied = await wallet_service.has_transaction(db, user_id, key)
+    credits = await reward_service.adjust_credits(
+        db,
+        jukebox_id=actor.jukebox_id,
+        user_id=user_id,
+        amount=payload.amount,
+        reason=payload.reason,
+        idempotency_key=payload.idempotency_key,
+    )
+    if not applied:
+        await audit_service.log_action(
+            db,
+            action="wallet.admin_adjust",
+            user_id=actor.user_id,
+            resource_type="jukebox_member",
+            resource_id=user_id,
+            detail={
+                "jukebox_id": actor.jukebox_id,
+                "amount": payload.amount,
+                "reason": payload.reason,
+                "idempotency_key": key,
+            },
+            request=request,
+        )
+    await db.commit()
+    return CreditAdjustmentOut(credits=credits)

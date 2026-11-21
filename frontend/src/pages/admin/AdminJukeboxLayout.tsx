@@ -184,6 +184,9 @@ export function AdminJukeboxLayout() {
           <NavLink to="members" className={tabClass}>
             Miembros
           </NavLink>
+          <NavLink to="rewards" className={tabClass}>
+            Recompensas
+          </NavLink>
           <NavLink to="activity" className={tabClass}>
             Actividad
           </NavLink>

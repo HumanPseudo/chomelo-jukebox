@@ -135,6 +135,21 @@ async def balance(db: AsyncSession, user_id: int) -> int:
     return wallet.credits if wallet is not None else 0
 
 
+async def has_transaction(db: AsyncSession, user_id: int, idempotency_key: str) -> bool:
+    wallet = await get_wallet(db, user_id, create=False)
+    if wallet is None:
+        return False
+    tx_id = (
+        await db.execute(
+            select(WalletTransaction.id).where(
+                WalletTransaction.wallet_id == wallet.id,
+                WalletTransaction.idempotency_key == idempotency_key,
+            )
+        )
+    ).scalar_one_or_none()
+    return tx_id is not None
+
+
 async def list_transactions(
     db: AsyncSession, user_id: int, limit: int = 20, offset: int = 0
 ) -> list[WalletTransaction]:

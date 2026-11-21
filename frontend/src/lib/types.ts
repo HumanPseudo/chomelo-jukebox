@@ -169,6 +169,10 @@ export interface WalletOut {
   transactions: WalletTransactionOut[];
 }
 
+export interface AdjustmentOut {
+  credits: number;
+}
+
 export interface PaymentOut {
   id: number;
   provider: string;

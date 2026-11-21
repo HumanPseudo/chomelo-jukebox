@@ -15,6 +15,7 @@ const KIND_LABEL: Record<string, string> = {
   bonus: "bono",
   spend: "gasto",
   boost: "impulsaste una canción",
+  admin_adjust: "ajuste del admin",
 };
 
 const PRESETS = [100, 500, 1000];

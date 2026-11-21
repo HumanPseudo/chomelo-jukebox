@@ -1,6 +1,7 @@
 import { api, tokens } from "./api";
 import type {
   ActivityOut,
+  AdjustmentOut,
   AttemptOut,
   AuditOut,
   CheckoutOut,
@@ -121,6 +122,18 @@ export const games = {
     api.post<AttemptOut>(`/jukeboxes/${jukeboxId}/games/${gameKey}/rounds/${roundId}/answer`, {
       title,
     }),
+};
+
+/** Ajustes manuales de créditos: solo ADMIN de la jukebox. */
+export const rewards = {
+  wallet: (jukeboxId: number, userId: number, limit = 20) =>
+    api.get<WalletOut>(`/jukeboxes/${jukeboxId}/members/${userId}/wallet`, { limit }),
+  adjust: (
+    jukeboxId: number,
+    userId: number,
+    payload: { amount: number; reason: string; idempotency_key: string },
+  ) =>
+    api.post<AdjustmentOut>(`/jukeboxes/${jukeboxId}/members/${userId}/credits`, payload),
 };
 
 /** Consola de plataforma: solo superusuarios. El backend sigue siendo la
