@@ -246,6 +246,19 @@
   margin-top: var(--space-3);
 }
 
+.prize-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(240px, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .prize-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 560px) {
   .guess-options {
     grid-template-columns: 1fr;

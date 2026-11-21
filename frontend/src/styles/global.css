@@ -20,10 +20,6 @@ body,
 body {
   margin: 0;
   background: var(--void);
-  background-image:
-    radial-gradient(ellipse at top, rgba(29, 185, 84, 0.15), transparent 50%),
-    linear-gradient(180deg, #1a1a1a 0%, var(--void) 100%);
-  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 15px;
@@ -42,14 +38,14 @@ h4 {
 }
 
 h1 {
-  font-size: 28px;
+  font-size: var(--step-2);
   font-weight: 700;
 }
 h2 {
-  font-size: 20px;
+  font-size: var(--step-1);
 }
 h3 {
-  font-size: 16px;
+  font-size: var(--step-0);
   color: var(--dim);
 }
 
@@ -95,16 +91,17 @@ textarea {
 .panel {
   position: relative;
   background: var(--panel);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--line);
-  clip-path: none;
-  border-radius: var(--radius);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
   padding: var(--space-5);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.panel:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .panel--accent {
@@ -126,12 +123,19 @@ textarea {
   border: none;
   cursor: pointer;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  padding: 10px 24px;
-  clip-path: none;
-  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 22px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut-sm)) 0,
+    100% var(--cut-sm),
+    100% 100%,
+    var(--cut-sm) 100%,
+    0 calc(100% - var(--cut-sm))
+  );
   transition:
     filter 0.12s ease,
     transform 0.05s ease;
@@ -157,7 +161,6 @@ textarea {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
-  clip-path: none;
   padding: 9px 16px;
 }
 .btn--ghost:hover:not(:disabled) {
@@ -198,6 +201,7 @@ textarea {
   color: var(--ink);
   padding: 10px 12px;
   font-size: 14px;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut-sm)), calc(100% - var(--cut-sm)) 100%, 0 100%);
 }
 
 .field input:focus,
@@ -217,13 +221,11 @@ textarea {
 
 .signal-dot--live {
   background: var(--frequency);
-  box-shadow: 0 0 6px var(--frequency);
   animation: pulse 2s ease-in-out infinite;
 }
 
 .signal-dot--rec {
   background: var(--alert);
-  box-shadow: 0 0 6px var(--alert);
   animation: pulse 1.1s ease-in-out infinite;
 }
 
@@ -246,6 +248,7 @@ textarea {
   padding: 3px 8px;
   border: 1px solid var(--line);
   color: var(--dim);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut-sm)), calc(100% - var(--cut-sm)) 100%, 0 100%);
 }
 
 .tag--live {
@@ -316,7 +319,7 @@ textarea {
   margin-bottom: 12px;
   padding: 8px 12px;
   background: var(--panel-raised);
-  border-radius: var(--radius);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut-sm)), calc(100% - var(--cut-sm)) 100%, 0 100%);
   font-size: 13px;
 }
 

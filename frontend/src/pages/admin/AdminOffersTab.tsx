@@ -106,7 +106,7 @@ export function AdminOffersTab() {
           {error}
         </p>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 24, alignItems: "start" }}>
+      <div className="offer-admin-layout">
         <Panel>
           <h3 style={{ marginTop: 0 }}>publicar oferta</h3>
           <form onSubmit={create}>

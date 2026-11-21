@@ -2,13 +2,18 @@
   min-height: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
+  justify-content: flex-start;
+  padding: var(--space-5) var(--space-5) var(--space-5) max(var(--space-5), 12vw);
 }
 
 .auth__panel {
   width: 100%;
-  max-width: 380px;
+  max-width: 460px;
+}
+
+.auth__brand {
+  border-top: 2px solid var(--action);
+  padding-top: var(--space-4);
 }
 
 .auth__brand {

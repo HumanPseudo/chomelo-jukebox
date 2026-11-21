@@ -7,24 +7,31 @@
 */
 
 :root {
-  --void: #121212;
-  --panel: #181818;
-  --panel-raised: #282828;
-  --signal: #1db954;
-  --signal-dim: #158a3e;
-  --frequency: #1db954;
-  --alert: #e8433d;
-  --ink: #ffffff;
-  --dim: #b3b3b3;
-  --line: #282828;
+  --void: #0f1112;
+  --panel: #17191a;
+  --panel-raised: #222526;
+  --action: #f0a92b;
+  --live: #2bd4e0;
+  --alarm: #e5484d;
+  --signal: var(--action);
+  --signal-dim: #b9811d;
+  --frequency: var(--live);
+  --alert: var(--alarm);
+  --ink: #f4f1e8;
+  --dim: #9ca3a3;
+  --line: #2a2e2f;
 
   --font-display: "Chakra Petch", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --cut: 0px;
-  --cut-sm: 0px;
-  --radius: 12px;
-  --radius-pill: 999px;
+  --step--1: clamp(0.8rem, 0.17vw + 0.76rem, 0.89rem);
+  --step-0: clamp(1rem, 0.34vw + 0.91rem, 1.19rem);
+  --step-1: clamp(1.25rem, 0.61vw + 1.1rem, 1.58rem);
+  --step-2: clamp(1.56rem, 1vw + 1.31rem, 2.11rem);
+  --step-3: clamp(1.95rem, 1.56vw + 1.56rem, 2.81rem);
+
+  --cut: 12px;
+  --cut-sm: 6px;
 
   --space-1: 4px;
   --space-2: 8px;

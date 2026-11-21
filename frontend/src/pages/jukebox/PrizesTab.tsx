@@ -81,7 +81,7 @@ export function PrizesTab() {
         }}
       >
         <div>
-          <h1 style={{ marginBottom: 4 }}> Premios</h1>
+          <h1 style={{ marginBottom: 4 }}>Premios</h1>
           <span className="mono" style={{ fontSize: 12, color: "var(--dim)" }}>
             canjea créditos por ofertas de la frecuencia
           </span>
@@ -97,7 +97,7 @@ export function PrizesTab() {
         </p>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "start" }}>
+      <div className="prize-layout">
         <div>
           {list.length === 0 && <Empty>no hay ofertas publicadas todavía</Empty>}
           {list.map((offer) => {

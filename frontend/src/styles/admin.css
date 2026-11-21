@@ -202,7 +202,18 @@
   text-decoration: underline;
 }
 
+.offer-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.6fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
 @media (max-width: 900px) {
+  .offer-admin-layout {
+    grid-template-columns: 1fr;
+  }
+
   .ov-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
