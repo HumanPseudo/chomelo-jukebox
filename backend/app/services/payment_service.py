@@ -20,13 +20,22 @@ from app.services import wallet_service
 MIN_CREDITS = 5
 MAX_CREDITS = 10000
 ALLOWED_CURRENCIES = {"eur", "usd", "cop"}
+DEFAULT_CREDIT_AMOUNTS = [100, 500, 1000]
 
 
-async def get_pricing(db: AsyncSession) -> tuple[int, str]:
+async def get_pricing(db: AsyncSession) -> PricingOut:
     row = await db.get(PaymentPricing, 1)
     if row is None:
-        return settings.cents_per_credit, settings.payment_currency.lower()
-    return row.cents_per_credit, row.currency.lower()
+        return PricingOut(
+            cents_per_credit=settings.cents_per_credit,
+            currency=settings.payment_currency.lower(),
+            credit_amounts=list(DEFAULT_CREDIT_AMOUNTS),
+        )
+    return PricingOut(
+        cents_per_credit=row.cents_per_credit,
+        currency=row.currency.lower(),
+        credit_amounts=row.credit_amounts or list(DEFAULT_CREDIT_AMOUNTS),
+    )
 
 
 async def update_pricing(
@@ -42,10 +51,15 @@ async def update_pricing(
         db.add(row)
     row.cents_per_credit = payload.cents_per_credit
     row.currency = payload.currency
+    row.credit_amounts = payload.credit_amounts
     row.updated_by = admin_user_id
     await db.commit()
     await db.refresh(row)
-    return PricingOut(cents_per_credit=row.cents_per_credit, currency=row.currency)
+    return PricingOut(
+        cents_per_credit=row.cents_per_credit,
+        currency=row.currency,
+        credit_amounts=row.credit_amounts,
+    )
 
 
 def _to_out(payment: Payment) -> PaymentOut:
@@ -77,10 +91,13 @@ async def create_checkout(
             code="invalid_amount",
             status_code=422,
         )
-    cents_per_credit, currency = await get_pricing(db)
+    pricing = await get_pricing(db)
+    if credits not in pricing.credit_amounts:
+        raise AppError("cantidad de créditos no disponible", code="invalid_amount", status_code=422)
+    currency = pricing.currency
     if currency not in ALLOWED_CURRENCIES:
         raise AppError("moneda no soportada", code="invalid_currency", status_code=422)
-    amount_cents = credits * cents_per_credit
+    amount_cents = credits * pricing.cents_per_credit
     try:
         result = await provider.create_checkout(
             amount_cents=amount_cents,

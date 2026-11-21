@@ -18,8 +18,6 @@ const KIND_LABEL: Record<string, string> = {
   admin_adjust: "ajuste del admin",
 };
 
-const PRESETS = [100, 500, 1000];
-
 const PAYMENT_STATUS_LABEL: Record<PaymentOut["status"], string> = {
   PENDING: "pendiente",
   PROCESSED: "procesado",
@@ -94,9 +92,15 @@ export function WalletView() {
           <p style={{ color: "var(--dim)", fontSize: 12 }}>
             1 crédito = {formatMoney(pricing?.cents_per_credit ?? 0)}
           </p>
+          {pricing && pricing.credit_amounts.length === 0 && <Empty>sin cantidades configuradas</Empty>}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {PRESETS.map((amount) => (
-              <Button key={amount} size="sm" disabled={busy} onClick={() => buy(amount)}>
+            {(pricing?.credit_amounts ?? []).map((amount) => (
+              <Button
+                key={amount}
+                size="sm"
+                disabled={busy || !pricing}
+                onClick={() => buy(amount)}
+              >
                 {amount} créditos · {formatMoney(amount * (pricing?.cents_per_credit ?? 0))}
               </Button>
             ))}

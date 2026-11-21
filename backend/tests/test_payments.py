@@ -7,6 +7,7 @@ from httpx import AsyncClient
 
 from app.api.schemas.payment import CheckoutRequest, PricingUpdate
 from app.core.config import settings
+from app.core.exceptions import AppError
 from app.domain.user import User
 from app.main import app
 from app.providers.payments import (
@@ -112,6 +113,7 @@ async def test_pricing_returns_server_values():
     body = r.json()
     assert body["cents_per_credit"] == settings.cents_per_credit
     assert body["currency"] == settings.payment_currency.lower()
+    assert body["credit_amounts"] == [100, 500, 1000]
 
 
 async def test_webhook_invalid_signature_400():
@@ -178,24 +180,24 @@ async def test_duplicate_event_does_not_double_credit():
     provider = _use_fake()
     async with AsyncClient(transport=transport, base_url=BASE) as c:
         token = await register_user(c, "pay4@test.com")
-        await _checkout(c, token, credits=50)
+        await _checkout(c, token, credits=100)
         await _webhook(c, provider)
         await _webhook(c, provider)
         wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
-    assert wallet["credits"] == 50
+    assert wallet["credits"] == 100
 
 
 async def test_new_event_for_same_session_no_double_credit():
     provider = _use_fake()
     async with AsyncClient(transport=transport, base_url=BASE) as c:
         token = await register_user(c, "pay5@test.com")
-        await _checkout(c, token, credits=30)
+        await _checkout(c, token, credits=100)
         await _webhook(c, provider, event_id="evt_test_1")
         # el proveedor reenvía un evento NUEVO (otro id) para la misma sesión
         await _webhook(c, provider, event_id="evt_test_2")
         wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
         payments = (await c.get("/api/v1/users/me/payments", headers=auth(token))).json()
-    assert wallet["credits"] == 30
+    assert wallet["credits"] == 100
     assert payments[0]["status"] == "CREDITS_GRANTED"
 
 
@@ -340,13 +342,22 @@ async def test_admin_pricing_changes_checkout_amount(db_session):
     db_session.add(user)
     await db_session.commit()
     pricing = await payment_service.update_pricing(
-        db_session, user.id, PricingUpdate(cents_per_credit=250, currency="cop")
+        db_session,
+        user.id,
+        PricingUpdate(cents_per_credit=250, currency="cop", credit_amounts=[100, 250]),
     )
     assert pricing.cents_per_credit == 250
+    assert pricing.credit_amounts == [100, 250]
 
     provider = FakePaymentProvider()
     checkout = await payment_service.create_checkout(
-        db_session, user, provider, CheckoutRequest(credits=100)
+        db_session, user, provider, CheckoutRequest(credits=250)
     )
-    assert checkout.payment.amount_cents == 25000
+    assert checkout.payment.amount_cents == 62500
     assert checkout.payment.currency == "cop"
+
+    with pytest.raises(AppError) as exc:
+        await payment_service.create_checkout(
+            db_session, user, provider, CheckoutRequest(credits=500)
+        )
+    assert exc.value.code == "invalid_amount"

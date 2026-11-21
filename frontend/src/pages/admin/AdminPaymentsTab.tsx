@@ -12,6 +12,7 @@ export function AdminPaymentsTab() {
   const [boostCost, setBoostCost] = useState(jukebox.boost_cost_credits);
   const [pricing, setPricing] = useState<PricingOut | null>(null);
   const [price, setPrice] = useState(0);
+  const [amounts, setAmounts] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,6 +20,7 @@ export function AdminPaymentsTab() {
     const next = await payments.pricing();
     setPricing(next);
     setPrice(next.cents_per_credit);
+    setAmounts(next.credit_amounts.join(", "));
   }, []);
 
   useEffect(() => {
@@ -34,6 +36,14 @@ export function AdminPaymentsTab() {
   ]);
 
   async function save() {
+    const creditAmounts = amounts
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isInteger(value) && value > 0);
+    if (creditAmounts.length === 0) {
+      setError("define al menos una cantidad de créditos");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -46,6 +56,7 @@ export function AdminPaymentsTab() {
         payments.updatePricing(jukebox.id, {
           cents_per_credit: price,
           currency: pricing?.currency ?? "cop",
+          credit_amounts: creditAmounts,
         }),
       ]);
       await Promise.all([reloadJukebox(), reloadPricing()]);
@@ -69,6 +80,9 @@ export function AdminPaymentsTab() {
             value={price}
             onChange={(e) => setPrice(Number(e.target.value))}
           />
+        </Field>
+        <Field label="cantidades de créditos permitidas (separadas por coma)">
+          <Input value={amounts} onChange={(e) => setAmounts(e.target.value)} />
         </Field>
         <Field label="cooldown para canción gratis (segundos)">
           <Input

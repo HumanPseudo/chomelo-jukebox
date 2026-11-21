@@ -24,8 +24,7 @@ async def payment_pricing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PricingOut:
-    cents_per_credit, currency = await payment_service.get_pricing(db)
-    return PricingOut(cents_per_credit=cents_per_credit, currency=currency)
+    return await payment_service.get_pricing(db)
 
 
 @router.patch("/jukeboxes/{jukebox_id}/payments/pricing", response_model=PricingOut)
@@ -45,6 +44,7 @@ async def update_payment_pricing(
             "jukebox_id": jukebox_id,
             "cents_per_credit": pricing.cents_per_credit,
             "currency": pricing.currency,
+            "credit_amounts": pricing.credit_amounts,
         },
         request=request,
     )

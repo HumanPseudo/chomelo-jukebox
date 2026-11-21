@@ -225,11 +225,13 @@ export interface OfferUpdate extends Partial<OfferCreate> {
 export interface PricingOut {
   cents_per_credit: number;
   currency: "cop" | "eur" | "usd";
+  credit_amounts: number[];
 }
 
 export interface PricingUpdate {
   cents_per_credit: number;
   currency?: "cop" | "eur" | "usd";
+  credit_amounts?: number[];
 }
 
 export interface PaymentOut {
