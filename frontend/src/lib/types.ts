@@ -173,6 +173,55 @@ export interface AdjustmentOut {
   credits: number;
 }
 
+export interface OfferOut {
+  id: number;
+  jukebox_id: number;
+  merchant: string;
+  title: string;
+  description: string;
+  terms: string;
+  image_url: string | null;
+  cost_credits: number;
+  stock_total: number;
+  stock_remaining: number;
+  status: "ACTIVE" | "PAUSED" | "EXHAUSTED" | "CLOSED";
+  starts_at: string | null;
+  ends_at: string | null;
+  my_redemption_status: RedemptionStatusValue | null;
+  my_code: string | null;
+}
+
+export type RedemptionStatusValue = "PENDING" | "APPROVED" | "REDEEMED" | "CANCELLED" | "EXPIRED";
+
+export interface RedemptionOut {
+  id: number;
+  jukebox_id: number;
+  offer_id: number;
+  offer_title: string;
+  user_id: number;
+  code: string | null;
+  credits_spent: number;
+  status: RedemptionStatusValue;
+  notes: string;
+  created_at: string;
+  approved_at: string | null;
+  redeemed_at: string | null;
+}
+
+export interface OfferCreate {
+  merchant: string;
+  title: string;
+  description: string;
+  terms: string;
+  image_url?: string | null;
+  cost_credits: number;
+  stock_total: number;
+}
+
+export interface OfferUpdate extends Partial<OfferCreate> {
+  status?: "ACTIVE" | "PAUSED" | "EXHAUSTED" | "CLOSED";
+}
+
 export interface PricingOut {
   cents_per_credit: number;
   currency: string;

@@ -11,6 +11,7 @@ import { JukeboxLayout } from "./pages/jukebox/JukeboxLayout";
 import { QueueTab } from "./pages/jukebox/QueueTab";
 import { PollsTab } from "./pages/jukebox/PollsTab";
 import { GamesTab } from "./pages/jukebox/GamesTab";
+import { PrizesTab } from "./pages/jukebox/PrizesTab";
 
 export function App() {
   return (
@@ -35,7 +36,8 @@ export function App() {
             <Route path="/jukeboxes/:id" element={<JukeboxLayout />}>
               <Route index element={<QueueTab />} />
               <Route path="polls" element={<PollsTab />} />
-            <Route path="games" element={<GamesTab />} />
+              <Route path="games" element={<GamesTab />} />
+              <Route path="prizes" element={<PrizesTab />} />
             </Route>
           </Route>
 

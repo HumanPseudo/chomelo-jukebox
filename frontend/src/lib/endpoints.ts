@@ -8,12 +8,17 @@ import type {
   JukeboxOut,
   ListenHistoryItem,
   MemberOut,
+  OfferCreate,
+  OfferOut,
+  OfferUpdate,
   PaymentOut,
   PollOut,
   PricingOut,
   ProfileOut,
   QueueItemOut,
   QueueOut,
+  RedemptionOut,
+  RedemptionStatusValue,
   ResolvedTrack,
   RoundOut,
   TokenResponse,
@@ -111,6 +116,29 @@ export const payments = {
   checkout: (credits: number, currency = "cop") =>
     api.post<CheckoutOut>("/users/me/payments/checkout", { credits, currency }),
   list: () => api.get<PaymentOut[]>("/users/me/payments"),
+};
+
+export const offers = {
+  list: (jukeboxId: number) => api.get<OfferOut[]>(`/jukeboxes/${jukeboxId}/offers`),
+  create: (jukeboxId: number, payload: OfferCreate) =>
+    api.post<OfferOut>(`/jukeboxes/${jukeboxId}/offers`, payload),
+  update: (jukeboxId: number, offerId: number, payload: OfferUpdate) =>
+    api.patch<OfferOut>(`/jukeboxes/${jukeboxId}/offers/${offerId}`, payload),
+  claim: (jukeboxId: number, offerId: number) =>
+    api.post<OfferOut>(`/jukeboxes/${jukeboxId}/offers/${offerId}/claim`),
+  redemptions: (jukeboxId: number) =>
+    api.get<RedemptionOut[]>(`/jukeboxes/${jukeboxId}/redemptions`),
+  updateRedemption: (
+    jukeboxId: number,
+    redemptionId: number,
+    status: RedemptionStatusValue,
+    notes = "",
+  ) =>
+    api.patch<RedemptionOut>(`/jukeboxes/${jukeboxId}/redemptions/${redemptionId}`, {
+      status,
+      notes,
+    }),
+  myRedemptions: () => api.get<RedemptionOut[]>("/users/me/redemptions"),
 };
 
 export const games = {

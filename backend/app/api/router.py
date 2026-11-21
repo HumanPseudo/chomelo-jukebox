@@ -7,6 +7,7 @@ from app.api.routes import (
     health,
     jukeboxes,
     music,
+    offers,
     payments,
     polls,
     profile,
@@ -26,6 +27,7 @@ api_router.include_router(music.router)
 api_router.include_router(queue.router)
 api_router.include_router(polls.router)
 api_router.include_router(games.router)
+api_router.include_router(offers.router)
 api_router.include_router(wallet.router)
 api_router.include_router(payments.router)
 api_router.include_router(ws.router)
