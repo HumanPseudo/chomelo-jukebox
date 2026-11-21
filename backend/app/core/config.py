@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,6 +52,23 @@ class Settings(BaseSettings):
     rate_limit_global_window: int = 60
     login_rate_limit_per_ip: int = 20
     login_rate_limit_window: int = 60
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        weak_secrets = {
+            "",
+            "change-me-in-prod",
+            "change-me-in-production",
+            "dev-secret-key-change-in-prod",
+        }
+        if self.environment == "production":
+            if self.jwt_secret in weak_secrets or len(self.jwt_secret) < 32:
+                raise ValueError(
+                    "CHOMELO_JWT_SECRET debe ser aleatorio y de al menos 32 caracteres"
+                )
+            if self.payment_provider == "wompi" and not self.wompi_events_secret:
+                raise ValueError("CHOMELO_WOMPI_EVENTS_SECRET es obligatorio con Wompi")
+        return self
 
 
 def get_settings() -> Settings:

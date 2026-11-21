@@ -13,6 +13,7 @@ from app.api.schemas.jukebox import (
 from app.core.exceptions import AppError
 from app.domain.jukebox import Jukebox, JukeboxMember, Role
 from app.domain.user import User
+from app.infra.ws_manager import ws_manager
 
 _ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # sin caracteres ambiguos (O, 0, I, 1)
 
@@ -234,6 +235,14 @@ async def _count_admins(db: AsyncSession, jukebox_id: int) -> int:
     return int(total)
 
 
+async def _lock_jukebox(db: AsyncSession, jukebox_id: int) -> None:
+    locked = (
+        await db.execute(select(Jukebox.id).where(Jukebox.id == jukebox_id).with_for_update())
+    ).scalar_one_or_none()
+    if locked is None:
+        raise AppError("jukebox no encontrada", code="jukebox_not_found", status_code=404)
+
+
 async def set_member_role(
     db: AsyncSession,
     actor: JukeboxMember,
@@ -244,6 +253,7 @@ async def set_member_role(
     # El route ya exige que `actor` sea ADMIN (require_role); con solo dos
     # roles, cualquier ADMIN administra a cualquier otro miembro. La única
     # red de seguridad es no dejar la jukebox sin ningún ADMIN.
+    await _lock_jukebox(db, jukebox_id)
     target = (
         await db.execute(
             select(JukeboxMember)
@@ -268,6 +278,7 @@ async def set_member_role(
 
     target.role = new_role.value
     await db.commit()
+    await ws_manager.disconnect_user(jukebox_id, target_user_id)
     return MemberOut(
         user_id=target.user_id,
         role=target.role,
@@ -284,6 +295,7 @@ def _display(member: JukeboxMember) -> str:
 async def remove_member(
     db: AsyncSession, actor: JukeboxMember, jukebox_id: int, target_user_id: int
 ) -> None:
+    await _lock_jukebox(db, jukebox_id)
     target = (
         await db.execute(
             select(JukeboxMember).where(
@@ -301,3 +313,4 @@ async def remove_member(
         )
     await db.delete(target)
     await db.commit()
+    await ws_manager.disconnect_user(jukebox_id, target_user_id)

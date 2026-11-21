@@ -1,13 +1,29 @@
+import hashlib
+import json
+
+import pytest
 from httpx import AsyncClient
 
+from app.core.config import settings
 from app.main import app
 from app.providers.payments import (
     PaymentProvider,
     PaymentProviderError,
     ProviderEvent,
+    WompiPaymentProvider,
     get_payment_provider,
 )
-from tests.helpers import BASE, auth, register_user, transport
+from tests.helpers import BASE, auth, transport
+
+
+async def register_user(client: AsyncClient, email: str) -> str:
+    digits = "".join(str(ord(ch) % 10) for ch in email if ch.isalnum())
+    r = await client.post(
+        "/api/v1/auth/register",
+        json={"phone_number": "+57" + digits[:12], "password": "secure123"},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["access_token"]
 
 
 class FakePaymentProvider(PaymentProvider):
@@ -17,28 +33,32 @@ class FakePaymentProvider(PaymentProvider):
         self.signature = signature
         self.session_id = "cs_test_123"
         self.event_id = "evt_test_1"
+        self._amount_cents = 0
 
     async def create_checkout(self, **kwargs) -> object:
         from app.providers.payments import CheckoutResult
 
+        self._amount_cents = int(kwargs["amount_cents"])
         return CheckoutResult(session_id=self.session_id, checkout_url="https://pay.test/checkout")
 
     async def verify_event(self, payload: bytes, signature: str) -> ProviderEvent:
         if signature != self.signature:
             raise PaymentProviderError()
+        data = json.loads(payload.decode("utf-8"))
+        obj = data.get("data", {}).get("object", {})
         return ProviderEvent(
-            event_id=self.event_id,
+            event_id=data.get("id", self.event_id),
             event_type="checkout.session.completed",
-            checkout_session_id=self.session_id,
-            paid=True,
-            amount_cents=self.amount_cents,
-            currency="eur",
-            raw={},
+            checkout_session_id=obj.get("id", self.session_id),
+            paid=obj.get("payment_status") == "paid",
+            amount_cents=int(obj.get("amount_total", self.amount_cents) or 0),
+            currency=obj.get("currency", "eur"),
+            raw=data,
         )
 
     @property
     def amount_cents(self) -> int:
-        return 0
+        return self._amount_cents
 
 
 def _use_fake(signature: str = "valid-sig") -> FakePaymentProvider:
@@ -180,3 +200,101 @@ async def test_webhook_unknown_session_safe():
         wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
     assert r.status_code == 200
     assert wallet["credits"] == 0
+
+
+async def test_checkout_rejects_client_selected_jukebox_price():
+    _use_fake()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        token = await register_user(c, "pay7@test.com")
+        r = await c.post(
+            "/api/v1/users/me/payments/checkout",
+            headers=auth(token),
+            json={"credits": 100, "jukebox_id": 1},
+        )
+    assert r.status_code == 422
+
+
+async def test_webhook_unpaid_event_does_not_grant_credits():
+    provider = _use_fake()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        token = await register_user(c, "pay8@test.com")
+        await _checkout(c, token, credits=100)
+        payload = (
+            f'{{"id": "evt_unpaid", "type": "checkout.session.completed", '
+            f'"data": {{"object": {{"id": "{provider.session_id}", "payment_status": "unpaid", '
+            f'"amount_total": {provider.amount_cents}, "currency": "eur"}}}}}}'
+        ).encode()
+        r = await c.post(
+            "/api/v1/payments/webhook",
+            content=payload,
+            headers={"Content-Type": "application/json", "stripe-signature": provider.signature},
+        )
+        wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
+    assert r.status_code == 200
+    assert r.json()["ignored"] == "payment_not_confirmed"
+    assert wallet["credits"] == 0
+
+
+async def test_webhook_amount_mismatch_does_not_grant_credits():
+    provider = _use_fake()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        token = await register_user(c, "pay9@test.com")
+        await _checkout(c, token, credits=100)
+        provider._amount_cents += 1
+        r = await _webhook(c, provider)
+        wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(token))).json()
+    assert r.status_code == 200
+    assert r.json()["ignored"] == "payment_not_confirmed"
+    assert wallet["credits"] == 0
+
+
+def test_wompi_requires_events_secret():
+    with pytest.raises(PaymentProviderError):
+        WompiPaymentProvider("pub", "priv", "", "https://checkout.wompi.co/l/x")
+
+
+async def test_wompi_rejects_unsigned_event():
+    provider = WompiPaymentProvider("pub", "priv", "secret", "https://checkout.wompi.co/l/x")
+    payload = (
+        b'{"id":"evt_1","event":"transaction.updated","timestamp":123,'
+        b'"data":{"transaction":{"reference":"wompi_1","status":"APPROVED",'
+        b'"amount_in_cents":1000,"currency":"cop"}}}'
+    )
+    with pytest.raises(PaymentProviderError):
+        await provider.verify_event(payload, "")
+
+
+async def test_wompi_accepts_signed_event():
+    provider = WompiPaymentProvider("pub", "priv", "secret", "https://checkout.wompi.co/l/x")
+    checksum = hashlib.sha256(b"wompi_1123secret").hexdigest()
+    data = {
+        "id": "evt_1",
+        "event": "transaction.updated",
+        "timestamp": 123,
+        "data": {
+            "transaction": {
+                "reference": "wompi_1",
+                "status": "APPROVED",
+                "amount_in_cents": 1000,
+                "currency": "cop",
+            }
+        },
+        "signature": {"properties": ["data.transaction.reference"], "checksum": checksum},
+    }
+    event = await provider.verify_event(json.dumps(data).encode(), "")
+    assert event.checkout_session_id == "wompi_1"
+    assert event.paid is True
+
+
+def test_production_config_rejects_weak_secrets(monkeypatch):
+    monkeypatch.setenv("CHOMELO_ENVIRONMENT", "production")
+    monkeypatch.setenv("CHOMELO_JWT_SECRET", "short")
+    with pytest.raises(ValueError):
+        settings.__class__(_env_file=None)
+    monkeypatch.setenv("CHOMELO_JWT_SECRET", "x" * 32)
+    monkeypatch.setenv("CHOMELO_PAYMENT_PROVIDER", "wompi")
+    with pytest.raises(ValueError):
+        settings.__class__(_env_file=None)
+    monkeypatch.setenv("CHOMELO_WOMPI_EVENTS_SECRET", "secret")
+    config = settings.__class__(_env_file=None)
+    assert config.wompi_events_secret == "secret"

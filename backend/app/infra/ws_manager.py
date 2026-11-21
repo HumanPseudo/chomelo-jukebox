@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
 from fastapi import WebSocket
@@ -40,25 +41,48 @@ class WSManager:
 
     def __init__(self) -> None:
         self.instance_id: str = uuid.uuid4().hex[:8]
-        self._connections: dict[int, set[WebSocket]] = {}
+        self._connections: dict[int, dict[WebSocket, tuple[int, datetime]]] = {}
         self._subscriber_task: asyncio.Task | None = None
 
     def reset(self) -> None:
         self._connections.clear()
 
-    async def connect(self, jukebox_id: int, websocket: WebSocket) -> None:
-        self._connections.setdefault(jukebox_id, set()).add(websocket)
+    async def connect(
+        self, jukebox_id: int, websocket: WebSocket, user_id: int, expires_at: datetime
+    ) -> None:
+        self._connections.setdefault(jukebox_id, {})[websocket] = (user_id, expires_at)
 
     def disconnect(self, jukebox_id: int, websocket: WebSocket) -> None:
         sockets = self._connections.get(jukebox_id)
         if sockets is None:
             return
-        sockets.discard(websocket)
+        sockets.pop(websocket, None)
         if not sockets:
             self._connections.pop(jukebox_id, None)
 
+    async def disconnect_user(self, jukebox_id: int, user_id: int) -> None:
+        for websocket, (owner_id, _) in list(self._connections.get(jukebox_id, {}).items()):
+            if owner_id != user_id:
+                continue
+            try:
+                await websocket.close(code=4403)
+            except Exception:
+                logger.debug("WS close failed after authorization change", exc_info=True)
+            self.disconnect(jukebox_id, websocket)
+
+    def is_expired(self, jukebox_id: int, websocket: WebSocket) -> bool:
+        meta = self._connections.get(jukebox_id, {}).get(websocket)
+        return meta is not None and meta[1] <= datetime.now(UTC)
+
     async def broadcast_local(self, jukebox_id: int, event: dict) -> None:
-        for websocket in list(self._connections.get(jukebox_id, ())):
+        for websocket in list(self._connections.get(jukebox_id, {})):
+            if self.is_expired(jukebox_id, websocket):
+                try:
+                    await websocket.close(code=4401)
+                except Exception:
+                    logger.debug("WS close failed after token expiry", exc_info=True)
+                self.disconnect(jukebox_id, websocket)
+                continue
             try:
                 await websocket.send_json(event)
             except Exception:

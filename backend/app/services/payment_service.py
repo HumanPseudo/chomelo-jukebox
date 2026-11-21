@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas.payment import CheckoutOut, CheckoutRequest, PaymentOut
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.domain.jukebox import Jukebox
 from app.domain.payment import Payment, PaymentEvent, PaymentStatus
 from app.domain.user import User
 from app.infra.db_utils import dialect_insert
@@ -13,6 +12,7 @@ from app.services import wallet_service
 
 MIN_CREDITS = 5
 MAX_CREDITS = 10000
+ALLOWED_CURRENCIES = {"eur", "usd", "cop"}
 
 
 def _price_cents(credits: int) -> int:
@@ -48,16 +48,14 @@ async def create_checkout(
             code="invalid_amount",
             status_code=422,
         )
-    cents_per_credit = settings.cents_per_credit
-    if payload.jukebox_id is not None:
-        jukebox = await db.get(Jukebox, payload.jukebox_id)
-        if jukebox is not None:
-            cents_per_credit = jukebox.credit_price_cents
-    amount_cents = credits * cents_per_credit
+    currency = payload.currency.lower()
+    if currency not in ALLOWED_CURRENCIES:
+        raise AppError("moneda no soportada", code="invalid_currency", status_code=422)
+    amount_cents = credits * settings.cents_per_credit
     try:
         result = await provider.create_checkout(
             amount_cents=amount_cents,
-            currency=payload.currency,
+            currency=currency,
             credits=credits,
             metadata={"user_id": str(user.id), "credits": str(credits)},
             success_url="{{FRONTEND_URL}}/wallet?status=success",
@@ -75,7 +73,7 @@ async def create_checkout(
         provider_session_id=result.session_id,
         credits=credits,
         amount_cents=amount_cents,
-        currency=payload.currency,
+        currency=currency,
     )
     db.add(payment)
     await db.commit()
@@ -124,6 +122,10 @@ async def consume_webhook(
         and payment
         and payment.status != PaymentStatus.CREDITS_GRANTED.value
     ):
+        if not event.paid or event.amount_cents != payment.amount_cents:
+            payment.status = PaymentStatus.FAILED.value
+            await db.commit()
+            return {"received": True, "ignored": "payment_not_confirmed"}
         payment.status = PaymentStatus.PROCESSED.value
         await wallet_service.credit(
             db,

@@ -13,10 +13,17 @@ const DRIFT_TOLERANCE_MS = 2000;
  * Los navegadores bloquean el autoplay con sonido sin un gesto del
  * usuario, así que expone `locked`/`unlock` para pedirlo.
  */
-export function useAudioSync(item: QueueItemOut | undefined, player: PlayerStateOut, enabled: boolean) {
+export function useAudioSync(
+  item: QueueItemOut | undefined,
+  player: PlayerStateOut,
+  enabled: boolean,
+  onFinished?: () => void,
+) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [locked, setLocked] = useState(false);
   const loadedTrackId = useRef<string | null>(null);
+  const endedItemId = useRef<number | null>(null);
+  const itemId = item?.id;
 
   // Resolver el stream real tarda varios segundos (yt-dlp + red); si el
   // usuario pausa mientras tanto, el callback async no debe usar el
@@ -48,13 +55,20 @@ export function useAudioSync(item: QueueItemOut | undefined, player: PlayerState
     if (!audio) return;
     const onPause = () => setLocked(player.is_playing);
     const onPlay = () => setLocked(false);
+    const onEnded = () => {
+      if (!itemId || endedItemId.current === itemId) return;
+      endedItemId.current = itemId;
+      onFinished?.();
+    };
     audio.addEventListener("pause", onPause);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("ended", onEnded);
     return () => {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("ended", onEnded);
     };
-  }, [enabled, player.is_playing]);
+  }, [enabled, player.is_playing, itemId, onFinished]);
 
   useEffect(() => {
     if (!enabled) return;

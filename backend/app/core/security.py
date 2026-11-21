@@ -23,27 +23,41 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def _create_token(subject: str, token_type: str, expires_delta: timedelta) -> str:
+def _create_token(
+    subject: str, token_type: str, expires_delta: timedelta, version: int = 0
+) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
         "type": token_type,
+        "ver": version,
         "iat": now,
         "exp": now + expires_delta,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(subject: str) -> str:
-    return _create_token(subject, "access", timedelta(minutes=settings.jwt_expire_minutes))
+def create_access_token(subject: str, version: int = 0) -> str:
+    return _create_token(
+        subject, "access", timedelta(minutes=settings.jwt_expire_minutes), version
+    )
 
 
-def create_refresh_token(subject: str) -> str:
-    return _create_token(subject, "refresh", timedelta(days=settings.jwt_refresh_expire_days))
+def create_refresh_token(subject: str, version: int = 0) -> str:
+    return _create_token(
+        subject, "refresh", timedelta(days=settings.jwt_refresh_expire_days), version
+    )
 
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+
+def token_version(payload: dict) -> int | None:
+    try:
+        return int(payload.get("ver", 0))
+    except (TypeError, ValueError):
+        return None
 
 
 async def get_current_user(
@@ -66,4 +80,6 @@ async def get_current_user(
     user = await db.get(User, user_id)
     if user is None or not user.is_active:
         raise AppError("usuario no encontrado", code="auth_invalid", status_code=401)
+    if token_version(payload) != user.token_version:
+        raise AppError("token revocado", code="auth_invalid", status_code=401)
     return user

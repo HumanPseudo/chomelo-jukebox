@@ -76,8 +76,6 @@ export function AdminJukeboxLayout() {
   // montado sin importar a dónde navegues, así no se corta la música.
   const playing = queueData?.items.find((i) => i.id === queueData.player.current_item_id);
   const player = queueData?.player ?? { is_playing: false, position_ms: 0, current_item_id: null };
-  const { audioRef, locked, unlock } = useAudioSync(playing, player, true);
-
   useWakeLock(player.is_playing);
   const onMediaPlay = useCallback(() => {
     const action = playing ? queue.player.resume : queue.player.play;
@@ -92,6 +90,12 @@ export function AdminJukeboxLayout() {
   const onMediaPrevious = useCallback(() => {
     queue.player.previous(jukeboxId).then(reloadQueue).catch(() => {});
   }, [jukeboxId, reloadQueue]);
+  const { audioRef, locked, unlock } = useAudioSync(
+    playing,
+    player,
+    true,
+    onMediaNext,
+  );
   useMediaSession(playing, player, {
     onPlay: onMediaPlay,
     onPause: onMediaPause,

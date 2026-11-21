@@ -10,6 +10,7 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     hash_password,
+    token_version,
     verify_password,
 )
 from app.domain.jukebox import Jukebox, JukeboxMember, Role
@@ -122,15 +123,20 @@ async def refresh_user(db: AsyncSession, refresh_token: str) -> User:
         user_id = int(payload.get("sub", "0"))
     except ValueError as exc:
         raise AppError("token de refresco inválido", code="auth_invalid", status_code=401) from exc
-    user = await db.get(User, user_id)
+    user = (
+        await db.execute(select(User).where(User.id == user_id).with_for_update())
+    ).scalar_one_or_none()
     if user is None or not user.is_active:
         raise AppError("usuario no encontrado", code="auth_invalid", status_code=401)
+    if token_version(payload) != user.token_version:
+        raise AppError("token de refresco revocado", code="auth_invalid", status_code=401)
+    user.token_version += 1
     return user
 
 
 def issue_tokens(user: User) -> TokenResponse:
     return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
+        access_token=create_access_token(str(user.id), user.token_version),
+        refresh_token=create_refresh_token(str(user.id), user.token_version),
         expires_in=settings.jwt_expire_minutes * 60,
     )

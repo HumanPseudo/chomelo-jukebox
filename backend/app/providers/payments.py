@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
 import hashlib
 import hmac
 import json
+from abc import ABC, abstractmethod
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -145,8 +145,6 @@ class MockPaymentProvider(PaymentProvider):
 
 
 def _json_loads(payload: bytes) -> dict:
-    import json
-
     try:
         data = json.loads(payload.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
@@ -174,7 +172,15 @@ def _normalize_event(data: dict) -> ProviderEvent:
 class WompiPaymentProvider(PaymentProvider):
     key = "wompi"
 
-    def __init__(self, public_key: str, private_key: str, events_secret: str, payment_link: str = "") -> None:
+    def __init__(
+        self,
+        public_key: str,
+        private_key: str,
+        events_secret: str,
+        payment_link: str = "",
+    ) -> None:
+        if not events_secret:
+            raise PaymentProviderError("Wompi requiere events_secret")
         self._public_key = public_key
         self._private_key = private_key
         self._events_secret = events_secret
@@ -207,28 +213,29 @@ class WompiPaymentProvider(PaymentProvider):
 
     async def verify_event(self, payload: bytes, signature: str) -> ProviderEvent:
         data = _json_loads(payload)
-        # Verificación de firma (checksum) si hay secreto configurado.
-        if self._events_secret:
-            sig = data.get("signature", {}) if isinstance(data.get("signature"), dict) else {}
-            props = sig.get("properties", [])
-            timestamp = data.get("timestamp")
-            values = []
-            for prop in props:
-                cur = data.get("data", {})
-                for part in str(prop).split("."):
-                    if isinstance(cur, dict):
-                        cur = cur.get(part)
-                    else:
-                        cur = None
-                values.append("" if cur is None else str(cur))
-            concat = "".join(values) + str(timestamp) + self._events_secret
-            expected = hashlib.sha256(concat.encode("utf-8")).hexdigest()
-            checksum = sig.get("checksum") or signature
-            if not checksum or not hmac.compare_digest(str(checksum), expected):
-                raise PaymentProviderError()
-        tx = data.get("data", {}).get("transaction", {}) if isinstance(data.get("data"), dict) else {}
+        sig = data.get("signature", {}) if isinstance(data.get("signature"), dict) else {}
+        props = sig.get("properties", [])
+        timestamp = data.get("timestamp")
+        values = []
+        for prop in props:
+            cur = data
+            for part in str(prop).split("."):
+                if isinstance(cur, dict):
+                    cur = cur.get(part)
+                else:
+                    cur = None
+            values.append("" if cur is None else str(cur))
+        concat = "".join(values) + str(timestamp) + self._events_secret
+        expected = hashlib.sha256(concat.encode("utf-8")).hexdigest()
+        checksum = sig.get("checksum") or signature
+        if not checksum or not hmac.compare_digest(str(checksum), expected):
+            raise PaymentProviderError()
+        payload_data = data.get("data", {})
+        tx = payload_data.get("transaction", {}) if isinstance(payload_data, dict) else {}
         status = str(tx.get("status", "")).upper()
-        event_type = COMPLETED_CHECKOUT_EVENT if status == "APPROVED" else str(data.get("event", ""))
+        event_type = (
+            COMPLETED_CHECKOUT_EVENT if status == "APPROVED" else str(data.get("event", ""))
+        )
         session_id = tx.get("reference") or tx.get("id")
         return ProviderEvent(
             event_id=str(data.get("id", data.get("event", ""))),
@@ -240,6 +247,7 @@ class WompiPaymentProvider(PaymentProvider):
             raw=data,
         )
 
+
 def get_payment_provider() -> PaymentProvider:
     if settings.payment_provider == "stripe":
         if not settings.stripe_secret_key or not settings.stripe_webhook_secret:
@@ -248,6 +256,8 @@ def get_payment_provider() -> PaymentProvider:
     if settings.payment_provider == "wompi":
         if not settings.wompi_payment_link:
             raise PaymentProviderError("Wompi no está configurado")
+        if settings.environment == "production" and not settings.wompi_events_secret:
+            raise PaymentProviderError("Wompi requiere events_secret en producción")
         return WompiPaymentProvider(
             settings.wompi_public_key,
             settings.wompi_private_key,

@@ -1,12 +1,13 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CheckoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     credits: int = Field(ge=5, le=10000)
     currency: str = Field(default="eur", min_length=3, max_length=3)
-    jukebox_id: int | None = Field(default=None, ge=1)
 
 
 class PaymentOut(BaseModel):

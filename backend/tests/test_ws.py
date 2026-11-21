@@ -11,7 +11,11 @@ PASS = PASSWORD
 
 
 def _register(client: TestClient, email: str) -> str:
-    r = client.post("/api/v1/auth/register", json={"email": email, "password": PASS})
+    digits = "".join(str(ord(ch) % 10) for ch in email if ch.isalnum())
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"phone_number": "+57" + digits[:12], "password": PASS},
+    )
     assert r.status_code == 201
     return r.json()["access_token"]
 
@@ -149,3 +153,23 @@ def test_ws_events_are_isolated_per_jukebox():
                 msg1 = ws1.receive_json()
                 assert msg1["event"] == "queue.updated"
                 assert msg1["data"]["item_id"] == r1.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_ws_manager_disconnects_user():
+    from datetime import UTC, datetime, timedelta
+
+    from app.infra.ws_manager import ws_manager
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.close_code: int | None = None
+
+        async def close(self, code: int) -> None:
+            self.close_code = code
+
+    socket = FakeWebSocket()
+    await ws_manager.connect(1, socket, 7, datetime.now(UTC) + timedelta(minutes=5))
+    await ws_manager.disconnect_user(1, 7)
+    assert socket.close_code == 4403
+    assert 1 not in ws_manager._connections
