@@ -15,6 +15,7 @@ from app.providers.payments import (
     PaymentProviderError,
     ProviderEvent,
     WompiPaymentProvider,
+    _wompi_base,
     get_payment_provider,
 )
 from app.services import payment_service
@@ -395,3 +396,11 @@ async def test_confirm_payment_from_redirect_is_idempotent():
     assert second.status_code == 200
     assert second.json()["duplicate"] is True
     assert wallet["credits"] == 100
+
+
+def test_wompi_sandbox_flag_selects_sandbox(monkeypatch):
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "wompi_sandbox", False)
+    assert _wompi_base() == "https://production.wompi.co"
+    monkeypatch.setattr(settings, "wompi_sandbox", True)
+    assert _wompi_base() == "https://sandbox.wompi.co"

@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
@@ -42,10 +43,14 @@ async def cast_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> Non
     if current is not None:
         if current.queue_item_id == item_id:
             return
-        await db.delete(current)
-        await db.flush()
+        raise AppError("ya emitiste tu voto", code="already_voted", status_code=409)
 
     db.add(Vote(jukebox_id=actor.jukebox_id, queue_item_id=item_id, user_id=actor.user_id))
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError("ya emitiste tu voto", code="already_voted", status_code=409) from None
     await xp_service.grant_xp(db, actor.user_id, xp_service.CAST_VOTE)
     await wallet_service.credit(
         db,
@@ -64,7 +69,4 @@ async def remove_vote(db: AsyncSession, actor: JukeboxMember, item_id: int) -> N
     vote = await _existing_vote(db, actor.jukebox_id, actor.user_id, item_id=item_id)
     if vote is None:
         return
-    await db.delete(vote)
-    await db.commit()
-    await queue_service.reorder_queue_by_score(db, actor.jukebox_id)
-    await notify_jukebox(actor.jukebox_id, "queue.updated", item_id=item_id)
+    raise AppError("el voto no se puede retirar", code="vote_locked", status_code=409)

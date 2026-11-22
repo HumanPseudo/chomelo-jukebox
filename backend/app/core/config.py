@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # Pagos: "mock" en desarrollo sin credenciales; "stripe"/"wompi" en producción.
     payment_provider: str = "mock"
     payment_currency: str = "cop"
+    wompi_sandbox: bool = False
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     wompi_public_key: str = ""

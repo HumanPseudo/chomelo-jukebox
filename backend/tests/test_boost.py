@@ -73,3 +73,20 @@ async def test_boost_recorded_in_wallet_ledger():
     assert after["credits"] == before["credits"] - 1
     assert after["transactions"][0]["kind"] == "boost"
     assert after["transactions"][0]["amount"] == -1
+
+
+async def test_boost_only_once_per_user_and_item():
+    owner_token, _member, jukebox_id, _code = await make_jukebox_x2()
+    async with AsyncClient(transport=transport, base_url=BASE) as c:
+        _first = (await add_item(c, owner_token, jukebox_id, "first")).json()
+        second = (await add_item(c, owner_token, jukebox_id, "second")).json()
+        boosted = await _boost(c, owner_token, jukebox_id, second["id"], 1)
+        retry = await _boost(c, owner_token, jukebox_id, second["id"], 1)
+        wallet = (await c.get("/api/v1/users/me/wallet", headers=auth(owner_token))).json()
+    assert boosted.status_code == 200
+    assert retry.status_code == 409
+    assert retry.json()["code"] == "already_boosted"
+    assert wallet["credits"] == 1
+    boost_txs = [tx for tx in wallet["transactions"] if tx["kind"] == "boost"]
+    assert len(boost_txs) == 1
+    assert boost_txs[0]["amount"] == -1

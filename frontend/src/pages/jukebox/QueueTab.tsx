@@ -31,8 +31,8 @@ export function QueueTab() {
   }, [lastEvent, reload]);
 
   async function toggleVote(itemId: number, voted: boolean) {
-    if (voted) await queue.unvote(jukebox.id, itemId);
-    else await queue.vote(jukebox.id, itemId);
+    if (voted) return;
+    await queue.vote(jukebox.id, itemId);
     reload();
   }
 
@@ -45,9 +45,11 @@ export function QueueTab() {
       setBoostError({
         itemId,
         message:
-          err instanceof ApiError && err.code === "insufficient_balance"
-            ? "no te alcanzan los créditos"
-            : "no se pudo impulsar",
+          err instanceof ApiError && err.code === "already_boosted"
+            ? "ya impulsaste esta canción"
+            : err instanceof ApiError && err.code === "insufficient_balance"
+              ? "no te alcanzan los créditos"
+              : "no se pudo impulsar",
       });
     }
   }

@@ -105,22 +105,27 @@ async def reorder_queue_by_score(db: AsyncSession, jukebox_id: int) -> None:
 async def boost_item(
     db: AsyncSession, actor: JukeboxMember, item_id: int, credits: int
 ) -> QueueItem:
-    """Gasta créditos para impulsar la posición de un ítem en la cola."""
-    item = await db.get(QueueItem, item_id)
+    """Gasta créditos una sola vez para impulsar un ítem en la cola."""
+    item = await db.get(QueueItem, item_id, with_for_update=True)
     if item is None or item.jukebox_id != actor.jukebox_id:
         raise AppError("ítem no encontrado", code="queue_item_not_found", status_code=404)
     if item.status != QueueStatus.QUEUED.value:
         raise AppError(
             "solo se pueden impulsar ítems en cola", code="item_not_boostable", status_code=409
         )
+    idempotency_key = f"boost:{actor.user_id}:{item_id}"
+    if await wallet_service.has_transaction(db, actor.user_id, idempotency_key):
+        raise AppError("ya impulsaste esta canción", code="already_boosted", status_code=409)
     await wallet_service.debit(
         db,
         actor.user_id,
         credits,
-        idempotency_key=f"boost:{actor.user_id}:{item_id}:{uuid4().hex}",
+        idempotency_key=idempotency_key,
         kind="boost",
         description=f"Impulsaste «{item.title}»",
     )
+    if not await wallet_service.has_transaction(db, actor.user_id, idempotency_key):
+        raise AppError("ya impulsaste esta canción", code="already_boosted", status_code=409)
     item.boost += credits
     await db.commit()
     await reorder_queue_by_score(db, actor.jukebox_id)
@@ -172,7 +177,7 @@ async def add_to_queue(
                         "espera para añadir gratis o usa créditos",
                         code="add_track_cooldown",
                         status_code=409,
-                    )
+                    ) from None
                 paid = True
 
     item = QueueItem(

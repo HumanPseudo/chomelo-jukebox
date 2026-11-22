@@ -75,7 +75,7 @@ async def test_cast_vote_updates_queue():
     assert [i["track_id"] for i in q["items"]] == ["bbb", "aaa"]
 
 
-async def test_one_vote_moves_between_items():
+async def test_vote_cannot_move_to_another_item():
     owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:
         item_a = (await add_item(c, owner_token, jukebox_id, "aaa")).json()
@@ -89,12 +89,13 @@ async def test_one_vote_moves_between_items():
             headers=auth(member_token),
         )
         q = await _queue(c, member_token, jukebox_id)
-    assert r.status_code == 204
+    assert r.status_code == 409
+    assert r.json()["code"] == "already_voted"
     by_id = {i["id"]: i for i in q["items"]}
-    assert by_id[item_a["id"]]["score"] == 0
-    assert by_id[item_a["id"]]["voted_by_me"] is False
-    assert by_id[item_b["id"]]["score"] == 1
-    assert by_id[item_b["id"]]["voted_by_me"] is True
+    assert by_id[item_a["id"]]["score"] == 1
+    assert by_id[item_a["id"]]["voted_by_me"] is True
+    assert by_id[item_b["id"]]["score"] == 0
+    assert by_id[item_b["id"]]["voted_by_me"] is False
 
 
 async def test_vote_same_item_idempotent():
@@ -144,7 +145,7 @@ async def test_two_votes_tie_keeps_add_order():
     assert [i["track_id"] for i in q["items"]] == ["aaa", "bbb", "ccc"]
 
 
-async def test_remove_vote():
+async def test_vote_cannot_be_removed():
     owner_token, member_token, jukebox_id, _code = await make_jukebox_x2()
     async with AsyncClient(transport=transport, base_url=BASE) as c:
         await add_item(c, owner_token, jukebox_id, "aaa")
@@ -158,11 +159,11 @@ async def test_remove_vote():
             headers=auth(member_token),
         )
         q = await _queue(c, member_token, jukebox_id)
-    assert r.status_code == 204
+    assert r.status_code == 409
+    assert r.json()["code"] == "vote_locked"
     by_id = {i["id"]: i for i in q["items"]}
-    assert by_id[item["id"]]["score"] == 0
-    assert by_id[item["id"]]["voted_by_me"] is False
-    assert [i["track_id"] for i in q["items"]] == ["bbb", "aaa"]
+    assert by_id[item["id"]]["score"] == 1
+    assert by_id[item["id"]]["voted_by_me"] is True
 
 
 async def test_remove_vote_idempotent():

@@ -15,6 +15,12 @@ from app.core.exceptions import AppError
 COMPLETED_CHECKOUT_EVENT = "checkout.session.completed"
 
 
+def _wompi_base() -> str:
+    if settings.wompi_sandbox or settings.environment != "production":
+        return "https://sandbox.wompi.co"
+    return "https://production.wompi.co"
+
+
 class CheckoutResult(BaseModel):
     session_id: str
     checkout_url: str
@@ -204,11 +210,7 @@ class WompiPaymentProvider(PaymentProvider):
     ) -> CheckoutResult:
         session_id = f"wompi_{uuid4().hex}"
         if self._private_key:
-            base = (
-                "https://production.wompi.co"
-                if settings.environment == "production"
-                else "https://sandbox.wompi.co"
-            )
+            base = _wompi_base()
             payload = {
                 "name": f"{credits} créditos Chomelo",
                 "description": f"Compra de {credits} créditos",
@@ -295,11 +297,7 @@ class WompiPaymentProvider(PaymentProvider):
             raise PaymentProviderError("Wompi requiere llave privada para verificar pagos")
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", transaction_id):
             raise PaymentProviderError("id de transacción inválido")
-        base = (
-            "https://production.wompi.co"
-            if settings.environment == "production"
-            else "https://sandbox.wompi.co"
-        )
+        base = _wompi_base()
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.get(
