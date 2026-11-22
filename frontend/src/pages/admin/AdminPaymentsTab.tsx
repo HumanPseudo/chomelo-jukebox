@@ -74,6 +74,9 @@ export function AdminPaymentsTab() {
         <p style={{ color: "var(--dim)", fontSize: 13, marginTop: 0 }}>
           el precio de compra es global; los costes internos son de esta jukebox.
         </p>
+        <p className="mono" style={{ color: "var(--dim)", fontSize: 11 }}>
+          Wompi COP: mínimo 150000 centavos por compra.
+        </p>
         <Field label={`precio de 1 crédito en céntimos (${pricing?.currency.toUpperCase() ?? "COP"})`}>
           <Input
             type="number"

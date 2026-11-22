@@ -150,7 +150,7 @@ async def test_checkout_creates_pending_payment():
     assert out["checkout_url"] == "https://pay.test/checkout"
     assert out["payment"]["status"] == "PENDING"
     assert out["payment"]["credits"] == 100
-    assert out["payment"]["amount_cents"] == 1000  # 100 créditos * 10 cents
+    assert out["payment"]["amount_cents"] == 150000  # 100 créditos * 1500 cents
     assert payments[0]["status"] == "PENDING"
 
 
@@ -355,16 +355,16 @@ async def test_admin_pricing_changes_checkout_amount(db_session):
     pricing = await payment_service.update_pricing(
         db_session,
         user.id,
-        PricingUpdate(cents_per_credit=250, currency="cop", credit_amounts=[100, 250]),
+        PricingUpdate(cents_per_credit=1500, currency="cop", credit_amounts=[100, 250]),
     )
-    assert pricing.cents_per_credit == 250
+    assert pricing.cents_per_credit == 1500
     assert pricing.credit_amounts == [100, 250]
 
     provider = FakePaymentProvider()
     checkout = await payment_service.create_checkout(
         db_session, user, provider, CheckoutRequest(credits=250)
     )
-    assert checkout.payment.amount_cents == 62500
+    assert checkout.payment.amount_cents == 375000
     assert checkout.payment.currency == "cop"
 
     with pytest.raises(AppError) as exc:

@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.config import WOMPI_MIN_TRANSACTION_CENTS
 
 
 class CheckoutRequest(BaseModel):
@@ -43,6 +45,16 @@ class PricingUpdate(BaseModel):
         if any(amount < 1 or amount > 100000 for amount in value):
             raise ValueError("cada cantidad debe estar entre 1 y 100000")
         return sorted(value)
+
+    @model_validator(mode="after")
+    def _validate_wompi_minimum(self) -> "PricingUpdate":
+        if self.currency == "cop":
+            minimum = min(self.credit_amounts) * self.cents_per_credit
+            if minimum < WOMPI_MIN_TRANSACTION_CENTS:
+                raise ValueError(
+                    f"Wompi requiere al menos {WOMPI_MIN_TRANSACTION_CENTS} centavos por compra"
+                )
+        return self
 
 
 class PaymentOut(BaseModel):

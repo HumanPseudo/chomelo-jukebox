@@ -10,7 +10,7 @@ from app.api.schemas.payment import (
     PricingOut,
     PricingUpdate,
 )
-from app.core.config import settings
+from app.core.config import WOMPI_MIN_TRANSACTION_CENTS, settings
 from app.core.exceptions import AppError
 from app.domain.payment import Payment, PaymentEvent, PaymentStatus
 from app.domain.payment_pricing import PaymentPricing
@@ -100,6 +100,12 @@ async def create_checkout(
     if currency not in ALLOWED_CURRENCIES:
         raise AppError("moneda no soportada", code="invalid_currency", status_code=422)
     amount_cents = credits * pricing.cents_per_credit
+    if currency == "cop" and amount_cents < WOMPI_MIN_TRANSACTION_CENTS:
+        raise AppError(
+            f"el pago mínimo es de {WOMPI_MIN_TRANSACTION_CENTS} centavos",
+            code="invalid_amount",
+            status_code=422,
+        )
     try:
         result = await provider.create_checkout(
             amount_cents=amount_cents,

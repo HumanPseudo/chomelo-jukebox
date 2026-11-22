@@ -1,6 +1,8 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+WOMPI_MIN_TRANSACTION_CENTS = 150000
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
     wompi_events_secret: str = ""
     wompi_integrity_secret: str = ""
     wompi_payment_link: str = "https://checkout.wompi.co/l/VPOS_yJJIDR"
-    cents_per_credit: int = 10
+    cents_per_credit: int = 1500
     add_track_cooldown_seconds: int = 0
     add_track_cost_credits: int = 5
 
