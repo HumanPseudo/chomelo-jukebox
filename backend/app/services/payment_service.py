@@ -136,7 +136,11 @@ async def create_checkout(
 
 
 async def _process_event(
-    db: AsyncSession, provider_event, *, user_id: int | None = None
+    db: AsyncSession,
+    provider_event,
+    *,
+    user_id: int | None = None,
+    provider_key: str | None = None,
 ) -> tuple[dict, Payment | None]:
     payment = (
         (
@@ -151,7 +155,26 @@ async def _process_event(
     )
     if user_id is not None:
         if payment is None or payment.user_id != user_id:
-            raise AppError("pago no encontrado", code="payment_not_found", status_code=404)
+            payment = None
+            if provider_key is not None:
+                payment = (
+                    await db.execute(
+                        select(Payment)
+                        .where(
+                            Payment.user_id == user_id,
+                            Payment.provider == provider_key,
+                            Payment.amount_cents == provider_event.amount_cents,
+                            Payment.currency == provider_event.currency.lower(),
+                            Payment.status == PaymentStatus.PENDING.value,
+                        )
+                        .order_by(Payment.id.desc())
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+            if payment is None:
+                raise AppError("pago no encontrado", code="payment_not_found", status_code=404)
+            if provider_event.checkout_session_id:
+                payment.provider_session_id = provider_event.checkout_session_id
 
     result = await db.execute(
         dialect_insert(db, PaymentEvent)
@@ -220,7 +243,9 @@ async def confirm_payment(
         raise AppError(
             "no se pudo verificar el pago", code="payment_verification_failed", status_code=502
         ) from None
-    result, payment = await _process_event(db, provider_event, user_id=user.id)
+    result, payment = await _process_event(
+        db, provider_event, user_id=user.id, provider_key=provider.key
+    )
     assert payment is not None
     return ConfirmOut(
         status=payment.status,

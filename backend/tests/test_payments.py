@@ -4,17 +4,21 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
-from app.api.schemas.payment import CheckoutRequest, PricingUpdate
+from app.api.schemas.payment import CheckoutRequest, ConfirmPaymentRequest, PricingUpdate
 from app.core.config import settings
 from app.core.exceptions import AppError
+from app.domain.payment import Payment, PaymentStatus
 from app.domain.user import User
 from app.main import app
 from app.providers.payments import (
+    COMPLETED_CHECKOUT_EVENT,
     PaymentProvider,
     PaymentProviderError,
     ProviderEvent,
     WompiPaymentProvider,
+    _tx_to_event,
     _wompi_base,
     get_payment_provider,
 )
@@ -404,3 +408,48 @@ def test_wompi_sandbox_flag_selects_sandbox(monkeypatch):
     assert _wompi_base() == "https://production.wompi.co"
     monkeypatch.setattr(settings, "wompi_sandbox", True)
     assert _wompi_base() == "https://sandbox.wompi.co"
+
+
+def test_wompi_transaction_uses_payment_link_id():
+    event = _tx_to_event(
+        {
+            "id": "12262892-1795308762-58997",
+            "payment_link_id": "test_49ORD8",
+            "reference": "test_49ORD8_1795308714_CdzQJJnCc",
+            "status": "APPROVED",
+            "amount_in_cents": 3000000,
+            "currency": "COP",
+        },
+        event_id="wompi_tx:12262892-1795308762-58997",
+        event_type=COMPLETED_CHECKOUT_EVENT,
+    )
+    assert event.checkout_session_id == "test_49ORD8"
+    assert event.amount_cents == 3000000
+    assert event.paid is True
+
+
+@pytest.mark.asyncio
+async def test_confirm_recovers_pending_payment_when_reference_changed(db_session):
+    user = User(phone_number="+573001234990", password_hash="hash")
+    db_session.add(user)
+    await db_session.commit()
+
+    provider = FakePaymentProvider()
+    await payment_service.create_checkout(
+        db_session, user, provider, CheckoutRequest(credits=100)
+    )
+    payment = (
+        await db_session.execute(select(Payment).where(Payment.user_id == user.id))
+    ).scalar_one()
+    payment.provider_session_id = "wompi_old_reference"
+    await db_session.commit()
+
+    confirmation = await payment_service.confirm_payment(
+        db_session,
+        user,
+        provider,
+        ConfirmPaymentRequest(transaction_id="01-1531231271-19365"),
+    )
+    assert confirmation.status == PaymentStatus.CREDITS_GRANTED.value
+    await db_session.refresh(payment)
+    assert payment.provider_session_id == provider.session_id

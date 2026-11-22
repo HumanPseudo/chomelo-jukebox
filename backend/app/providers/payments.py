@@ -21,6 +21,20 @@ def _wompi_base() -> str:
     return "https://production.wompi.co"
 
 
+def _tx_to_event(tx: dict, event_id: str, event_type: str):
+    status = str(tx.get("status", "")).upper()
+    session_id = tx.get("payment_link_id") or tx.get("reference") or tx.get("id")
+    return ProviderEvent(
+        event_id=event_id,
+        event_type=event_type,
+        checkout_session_id=str(session_id) if session_id else None,
+        paid=status == "APPROVED",
+        amount_cents=int(tx.get("amount_in_cents", 0) or 0),
+        currency=str(tx.get("currency", "cop") or "cop").lower(),
+        raw=tx,
+    )
+
+
 class CheckoutResult(BaseModel):
     session_id: str
     checkout_url: str
@@ -237,6 +251,8 @@ class WompiPaymentProvider(PaymentProvider):
             )
             if not checkout_url:
                 raise PaymentProviderError("Wompi no devolvió un link de pago")
+            if data.get("id"):
+                session_id = str(data["id"])
         elif self._public_key and self._integrity_secret:
             integrity = (
                 session_id + str(amount_cents) + currency.upper() + self._integrity_secret
@@ -281,15 +297,10 @@ class WompiPaymentProvider(PaymentProvider):
         event_type = (
             COMPLETED_CHECKOUT_EVENT if status == "APPROVED" else str(data.get("event", ""))
         )
-        session_id = tx.get("reference") or tx.get("id")
-        return ProviderEvent(
+        return _tx_to_event(
+            tx,
             event_id=str(data.get("id", data.get("event", ""))),
             event_type=event_type,
-            checkout_session_id=str(session_id) if session_id else None,
-            paid=(status == "APPROVED"),
-            amount_cents=int(tx.get("amount_in_cents", 0) or 0),
-            currency=str(tx.get("currency", "cop") or "cop"),
-            raw=data,
         )
 
     async def verify_transaction(self, transaction_id: str) -> ProviderEvent:
@@ -308,15 +319,10 @@ class WompiPaymentProvider(PaymentProvider):
             data = response.json().get("data", {})
         except (httpx.HTTPError, ValueError) as exc:
             raise PaymentProviderError("no se pudo verificar la transacción") from exc
-        status = str(data.get("status", "")).upper()
-        return ProviderEvent(
+        return _tx_to_event(
+            data,
             event_id=f"wompi_tx:{data.get('id', transaction_id)}",
             event_type=COMPLETED_CHECKOUT_EVENT,
-            checkout_session_id=str(data.get("reference", "")) or None,
-            paid=status == "APPROVED",
-            amount_cents=int(data.get("amount_in_cents", 0) or 0),
-            currency=str(data.get("currency", "cop") or "cop").lower(),
-            raw=data,
         )
 
 
