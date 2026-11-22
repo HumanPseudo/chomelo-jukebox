@@ -40,6 +40,7 @@ class QueueItem(Base, TimestampMixin):
     position: Mapped[int | None] = mapped_column(Integer, nullable=True)
     played_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     boost: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    credits_spent: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
 
 class Player(Base, TimestampMixin):

@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -163,21 +162,6 @@ async def add_to_queue(
                 last_at = last_at.replace(tzinfo=UTC)
             elapsed = (datetime.now(UTC) - last_at).total_seconds()
             if elapsed < cooldown:
-                try:
-                    await wallet_service.debit(
-                        db,
-                        member.user_id,
-                        cost,
-                        idempotency_key=f"add_track_paid:{member.user_id}:{uuid4().hex}",
-                        kind="add_track_paid",
-                        description="Añadiste una canción usando créditos",
-                    )
-                except AppError:
-                    raise AppError(
-                        "espera para añadir gratis o usa créditos",
-                        code="add_track_cooldown",
-                        status_code=409,
-                    ) from None
                 paid = True
 
     item = QueueItem(
@@ -190,9 +174,28 @@ async def add_to_queue(
         added_by=member.user_id,
         status=QueueStatus.QUEUED.value,
         position=len(queued),
+        credits_spent=cost if paid else 0,
     )
     db.add(item)
     await db.flush()
+
+    if paid:
+        try:
+            await wallet_service.debit(
+                db,
+                member.user_id,
+                cost,
+                idempotency_key=f"add_track_paid:{member.user_id}:{item.id}",
+                kind="add_track_paid",
+                description="Añadiste una canción usando créditos",
+            )
+        except AppError:
+            raise AppError(
+                "espera para añadir gratis o usa créditos",
+                code="add_track_cooldown",
+                status_code=409,
+            ) from None
+
     await xp_service.grant_xp(db, member.user_id, xp_service.ADD_TRACK)
     if not paid:
         await wallet_service.credit(
@@ -263,6 +266,16 @@ async def remove_item(db: AsyncSession, actor: JukeboxMember, item_id: int) -> N
     can_moderate = Role(actor.role) is Role.ADMIN
     if not can_moderate and item.added_by != actor.user_id:
         raise AppError("permiso insuficiente", code="insufficient_role", status_code=403)
+
+    if item.credits_spent > 0:
+        await wallet_service.credit(
+            db,
+            item.added_by,
+            item.credits_spent,
+            idempotency_key=f"add_track_refund:{item_id}",
+            kind="add_track_refund",
+            description="Devolución por canción quitada de la cola",
+        )
 
     original_position = item.position
     await db.delete(item)

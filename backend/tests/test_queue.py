@@ -8,6 +8,7 @@ from app.domain.queue import Player
 from app.main import app
 from app.providers.music import MusicProvider, MusicProviderError, TrackInfo
 from app.services.queue_service import live_position_ms
+from tests.helpers import phone_for, promote_to_superuser
 
 _transport = ASGITransport(app=app)
 _BASE = "http://test"
@@ -48,9 +49,9 @@ def _auth(token: str) -> dict[str, str]:
 async def _register(client: AsyncClient, email: str) -> str:
     r = await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": _PASSWORD},
+        json={"phone_number": phone_for(email), "password": _PASSWORD},
     )
-    assert r.status_code == 201
+    assert r.status_code == 201, r.text
     return r.json()["access_token"]
 
 
@@ -59,6 +60,7 @@ async def _make_jukebox_x2() -> tuple[str, str, int, str]:
     _use_fake_music()
     async with AsyncClient(transport=_transport, base_url=_BASE) as c:
         owner_token = await _register(c, "qowner@test.com")
+        await promote_to_superuser("qowner@test.com")
         member_token = await _register(c, "qmember@test.com")
         jb = (
             await c.post(
@@ -302,6 +304,68 @@ async def test_remove_playing_item_409():
         )
     assert r.status_code == 409
     assert r.json()["code"] == "item_not_removable"
+
+
+async def test_admin_removal_refunds_paid_add():
+    owner_token, member_token, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        config = await c.patch(
+            f"/api/v1/jukeboxes/{jukebox_id}",
+            headers=_auth(owner_token),
+            json={"add_track_cooldown_seconds": 3600, "add_track_cost_credits": 1},
+        )
+        assert config.status_code == 200, config.text
+
+        assert (await _add(c, member_token, jukebox_id, "free")).status_code == 201
+        paid = await _add(c, member_token, jukebox_id, "paid")
+        assert paid.status_code == 201, paid.text
+
+        before = (await c.get("/api/v1/users/me/wallet", headers=_auth(member_token))).json()
+        assert before["credits"] == 0
+        assert before["transactions"][0]["kind"] == "add_track_paid"
+
+        r = await c.delete(
+            f"/api/v1/jukeboxes/{jukebox_id}/queue/{paid.json()['id']}",
+            headers=_auth(owner_token),
+        )
+        assert r.status_code == 204, r.text
+
+        after = (await c.get("/api/v1/users/me/wallet", headers=_auth(member_token))).json()
+        assert after["credits"] == 1
+        assert after["transactions"][0]["kind"] == "add_track_refund"
+        assert after["transactions"][0]["amount"] == 1
+
+
+async def test_removal_of_free_add_does_not_refund():
+    owner_token, member_token, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        item = (await _add(c, member_token, jukebox_id, "free")).json()
+        r = await c.delete(
+            f"/api/v1/jukeboxes/{jukebox_id}/queue/{item['id']}", headers=_auth(owner_token)
+        )
+        assert r.status_code == 204, r.text
+        wallet = (await c.get("/api/v1/users/me/wallet", headers=_auth(member_token))).json()
+    assert wallet["credits"] == 1
+    assert all(t["kind"] != "add_track_refund" for t in wallet["transactions"])
+
+
+async def test_failed_paid_add_leaves_no_queue_item():
+    owner_token, member_token, jukebox_id, _code = await _make_jukebox_x2()
+    async with AsyncClient(transport=_transport, base_url=_BASE) as c:
+        config = await c.patch(
+            f"/api/v1/jukeboxes/{jukebox_id}",
+            headers=_auth(owner_token),
+            json={"add_track_cooldown_seconds": 3600, "add_track_cost_credits": 10},
+        )
+        assert config.status_code == 200, config.text
+        assert (await _add(c, member_token, jukebox_id, "free")).status_code == 201
+        denied = await _add(c, member_token, jukebox_id, "expensive")
+        assert denied.status_code == 409
+        assert denied.json()["code"] == "add_track_cooldown"
+        queue = (
+            await c.get(f"/api/v1/jukeboxes/{jukebox_id}/queue", headers=_auth(owner_token))
+        ).json()
+    assert [i["track_id"] for i in queue["items"]] == ["free"]
 
 
 async def test_move_item():
