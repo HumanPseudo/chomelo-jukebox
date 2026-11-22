@@ -3,6 +3,7 @@ import hmac
 import json
 import re
 from abc import ABC, abstractmethod
+from datetime import datetime
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -24,6 +25,13 @@ def _wompi_base() -> str:
 def _tx_to_event(tx: dict, event_id: str, event_type: str):
     status = str(tx.get("status", "")).upper()
     session_id = tx.get("payment_link_id") or tx.get("reference") or tx.get("id")
+    created_at = None
+    raw_created = tx.get("created_at")
+    if isinstance(raw_created, str):
+        try:
+            created_at = datetime.fromisoformat(raw_created.replace("Z", "+00:00"))
+        except ValueError:
+            created_at = None
     return ProviderEvent(
         event_id=event_id,
         event_type=event_type,
@@ -31,6 +39,7 @@ def _tx_to_event(tx: dict, event_id: str, event_type: str):
         paid=status == "APPROVED",
         amount_cents=int(tx.get("amount_in_cents", 0) or 0),
         currency=str(tx.get("currency", "cop") or "cop").lower(),
+        created_at=created_at,
         raw=tx,
     )
 
@@ -49,6 +58,7 @@ class ProviderEvent(BaseModel):
     paid: bool = False
     amount_cents: int = 0
     currency: str = "eur"
+    created_at: datetime | None = None
     raw: dict
 
     @property

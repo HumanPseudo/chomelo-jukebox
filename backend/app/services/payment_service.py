@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +25,10 @@ MIN_CREDITS = 5
 MAX_CREDITS = 10000
 ALLOWED_CURRENCIES = {"eur", "usd", "cop"}
 DEFAULT_CREDIT_AMOUNTS = [100, 500, 1000]
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 async def get_pricing(db: AsyncSession) -> PricingOut:
@@ -141,6 +147,7 @@ async def _process_event(
     *,
     user_id: int | None = None,
     provider_key: str | None = None,
+    admin_override: bool = False,
 ) -> tuple[dict, Payment | None]:
     payment = (
         (
@@ -153,24 +160,32 @@ async def _process_event(
         if provider_event.checkout_session_id
         else None
     )
-    if user_id is not None:
-        if payment is None or payment.user_id != user_id:
+    if user_id is not None or admin_override:
+        if payment is None or (user_id is not None and payment.user_id != user_id):
             payment = None
             if provider_key is not None:
-                payment = (
-                    await db.execute(
-                        select(Payment)
-                        .where(
-                            Payment.user_id == user_id,
-                            Payment.provider == provider_key,
-                            Payment.amount_cents == provider_event.amount_cents,
-                            Payment.currency == provider_event.currency.lower(),
-                            Payment.status == PaymentStatus.PENDING.value,
-                        )
-                        .order_by(Payment.id.desc())
-                        .limit(1)
+                stmt = select(Payment).where(
+                    Payment.provider == provider_key,
+                    Payment.amount_cents == provider_event.amount_cents,
+                    Payment.currency == provider_event.currency.lower(),
+                    Payment.status == PaymentStatus.PENDING.value,
+                )
+                if user_id is not None and not admin_override:
+                    stmt = stmt.where(Payment.user_id == user_id)
+                candidates = (await db.execute(stmt)).scalars().all()
+                if provider_event.created_at is not None:
+                    target = _as_utc(provider_event.created_at)
+                    candidates = [
+                        item
+                        for item in candidates
+                        if abs((_as_utc(item.created_at) - target).total_seconds()) <= 900
+                    ]
+                    candidates.sort(
+                        key=lambda item: abs((_as_utc(item.created_at) - target).total_seconds())
                     )
-                ).scalar_one_or_none()
+                else:
+                    candidates = sorted(candidates, key=lambda item: item.id, reverse=True)
+                payment = candidates[0] if candidates else None
             if payment is None:
                 raise AppError("pago no encontrado", code="payment_not_found", status_code=404)
             if provider_event.checkout_session_id:
@@ -245,6 +260,26 @@ async def confirm_payment(
         ) from None
     result, payment = await _process_event(
         db, provider_event, user_id=user.id, provider_key=provider.key
+    )
+    assert payment is not None
+    return ConfirmOut(
+        status=payment.status,
+        credits=payment.credits,
+        duplicate=bool(result.get("duplicate")),
+    )
+
+
+async def confirm_payment_as_admin(
+    db: AsyncSession, provider: PaymentProvider, payload: ConfirmPaymentRequest
+) -> ConfirmOut:
+    try:
+        provider_event = await provider.verify_transaction(payload.transaction_id)
+    except PaymentProviderError:
+        raise AppError(
+            "no se pudo verificar el pago", code="payment_verification_failed", status_code=502
+        ) from None
+    result, payment = await _process_event(
+        db, provider_event, provider_key=provider.key, admin_override=True
     )
     assert payment is not None
     return ConfirmOut(

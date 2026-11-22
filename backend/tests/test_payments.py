@@ -453,3 +453,23 @@ async def test_confirm_recovers_pending_payment_when_reference_changed(db_sessio
     assert confirmation.status == PaymentStatus.CREDITS_GRANTED.value
     await db_session.refresh(payment)
     assert payment.provider_session_id == provider.session_id
+
+
+@pytest.mark.asyncio
+async def test_admin_can_confirm_another_users_pending_payment(db_session):
+    user = User(phone_number="+573001234991", password_hash="hash")
+    db_session.add(user)
+    await db_session.commit()
+
+    provider = FakePaymentProvider()
+    await payment_service.create_checkout(
+        db_session, user, provider, CheckoutRequest(credits=100)
+    )
+
+    confirmation = await payment_service.confirm_payment_as_admin(
+        db_session,
+        provider,
+        ConfirmPaymentRequest(transaction_id="01-1531231271-19365"),
+    )
+    assert confirmation.status == PaymentStatus.CREDITS_GRANTED.value
+    assert confirmation.credits == 100

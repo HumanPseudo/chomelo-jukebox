@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.audit import AuditOut
+from app.api.schemas.payment import ConfirmOut, ConfirmPaymentRequest
 from app.core.exceptions import AppError
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.domain.user import User
-from app.services import audit_service
+from app.providers.payments import PaymentProvider, get_payment_provider
+from app.services import audit_service, payment_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -28,3 +30,22 @@ async def audit_log(
     db: AsyncSession = Depends(get_db),
 ) -> list[AuditOut]:
     return await audit_service.list_audit(db, limit=limit, offset=offset, action=action)
+
+
+@router.post("/payments/confirm", response_model=ConfirmOut)
+async def confirm_payment_as_admin(
+    payload: ConfirmPaymentRequest,
+    request: Request,
+    _: User = Depends(require_superuser),
+    provider: PaymentProvider = Depends(get_payment_provider),
+    db: AsyncSession = Depends(get_db),
+) -> ConfirmOut:
+    confirmation = await payment_service.confirm_payment_as_admin(db, provider, payload)
+    await audit_service.log_action(
+        db,
+        action="payment.admin_confirm",
+        detail={"status": confirmation.status},
+        request=request,
+    )
+    await db.commit()
+    return confirmation
